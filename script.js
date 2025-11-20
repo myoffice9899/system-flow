@@ -14,8 +14,12 @@ class DiagramEditor {
         this.isDragging = false;
         this.isResizing = false;
         this.isSelecting = false;
+        this.isPanning = false;
+        this.panStartX = 0;
+        this.panStartY = 0;
         this.dragStartX = 0;
         this.dragStartY = 0;
+        this.lastMousePos = null; // Store last mouse position for zoom
         this.selectionBox = null;
         this.resizeHandle = null;
         this.connectionStart = null;
@@ -184,10 +188,10 @@ class DiagramEditor {
                     this.redraw();
                 } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
                     e.preventDefault();
-                    this.zoomIn();
+                    this.zoomIn(this.lastMousePos);
                 } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
                     e.preventDefault();
-                    this.zoomOut();
+                    this.zoomOut(this.lastMousePos);
                 } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
                     e.preventDefault();
                     this.resetZoom();
@@ -246,11 +250,11 @@ class DiagramEditor {
             } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
                 // Zoom In (Ctrl+= or Ctrl++)
                 e.preventDefault();
-                this.zoomIn();
+                this.zoomIn(this.lastMousePos);
             } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
                 // Zoom Out (Ctrl+-)
                 e.preventDefault();
-                this.zoomOut();
+                this.zoomOut(this.lastMousePos);
             } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
                 // Reset Zoom (Ctrl+0)
                 e.preventDefault();
@@ -618,12 +622,12 @@ class DiagramEditor {
         document.getElementById('zoomOut').addEventListener('click', () => this.zoomOut());
         document.getElementById('zoomReset').addEventListener('click', () => this.resetZoom());
 
-        // Ctrl+Scroll wheel zoom
+        // Ctrl+Scroll wheel zoom (zoom at mouse position)
         this.canvas.addEventListener('wheel', (e) => {
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
                 const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                this.setZoom(this.zoom + delta);
+                this.zoomAtPoint(this.zoom + delta, e);
             }
         }, { passive: false });
 
@@ -672,7 +676,13 @@ class DiagramEditor {
             return;
         }
 
-        if (this.currentTool === 'draw') {
+        if (this.currentTool === 'pan') {
+            // Start panning
+            this.isPanning = true;
+            this.panStartX = e.clientX - this.panX;
+            this.panStartY = e.clientY - this.panY;
+            this.canvas.style.cursor = 'grabbing';
+        } else if (this.currentTool === 'draw') {
             // Check if clicking on connection midpoint FIRST (highest priority)
             const connection = this.getConnectionMidpointAt(pos);
             if (connection) {
@@ -764,7 +774,18 @@ class DiagramEditor {
     }
 
     handleMouseMove(e) {
+        // Store last mouse position for keyboard zoom
+        this.lastMousePos = e;
+
         const pos = this.getMousePos(e);
+
+        if (this.isPanning) {
+            // Pan the canvas
+            this.panX = e.clientX - this.panStartX;
+            this.panY = e.clientY - this.panStartY;
+            this.redraw();
+            return;
+        }
 
         if (this.isDrawing && this.currentTool === 'draw') {
             this.redraw();
@@ -832,6 +853,13 @@ class DiagramEditor {
     }
 
     handleMouseUp(e) {
+        // End panning
+        if (this.isPanning) {
+            this.isPanning = false;
+            this.canvas.style.cursor = this.currentTool === 'pan' ? 'grab' : 'crosshair';
+            return;
+        }
+
         let needsSave = false;
 
         if (this.isDrawing) {
@@ -1230,12 +1258,12 @@ class DiagramEditor {
     }
 
     // Zoom methods
-    zoomIn() {
-        this.setZoom(this.zoom + 0.1);
+    zoomIn(mousePos = null) {
+        this.zoomAtPoint(this.zoom + 0.1, mousePos);
     }
 
-    zoomOut() {
-        this.setZoom(this.zoom - 0.1);
+    zoomOut(mousePos = null) {
+        this.zoomAtPoint(this.zoom - 0.1, mousePos);
     }
 
     resetZoom() {
@@ -1248,6 +1276,35 @@ class DiagramEditor {
 
     setZoom(newZoom) {
         this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
+        this.updateZoomDisplay();
+        this.redraw();
+    }
+
+    zoomAtPoint(newZoom, mousePos = null) {
+        const oldZoom = this.zoom;
+        newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
+
+        if (mousePos) {
+            // Get canvas rect for accurate mouse position
+            const rect = this.canvas.getBoundingClientRect();
+            const mouseX = mousePos.clientX - rect.left;
+            const mouseY = mousePos.clientY - rect.top;
+
+            // Calculate world position before zoom
+            const worldX = (mouseX - this.panX) / oldZoom;
+            const worldY = (mouseY - this.panY) / oldZoom;
+
+            // Update zoom
+            this.zoom = newZoom;
+
+            // Calculate new pan to keep same world position under mouse
+            this.panX = mouseX - worldX * newZoom;
+            this.panY = mouseY - worldY * newZoom;
+        } else {
+            // Zoom from center if no mouse position provided
+            this.zoom = newZoom;
+        }
+
         this.updateZoomDisplay();
         this.redraw();
     }
@@ -5756,6 +5813,9 @@ class TabManager {
             } else if (activeToolBtn.id === 'selectTool') {
                 // Select tool is active
                 editor.currentTool = 'select';
+            } else if (activeToolBtn.id === 'panTool') {
+                // Pan tool is active
+                editor.currentTool = 'pan';
             }
         }
 
@@ -5811,9 +5871,15 @@ class TabManager {
                 // Shape tool is active
                 newTab.editor.currentTool = 'draw';
                 newTab.editor.currentShape = shapeType;
+                newTab.editor.canvas.style.cursor = 'crosshair';
             } else if (activeToolBtn.id === 'selectTool') {
                 // Select tool is active
                 newTab.editor.currentTool = 'select';
+                newTab.editor.canvas.style.cursor = 'crosshair';
+            } else if (activeToolBtn.id === 'panTool') {
+                // Pan tool is active
+                newTab.editor.currentTool = 'pan';
+                newTab.editor.canvas.style.cursor = 'grab';
             }
         }
 
@@ -6019,10 +6085,25 @@ function setupSharedUIEvents() {
         const activeEditor = window.tabManager?.getActiveEditor();
         if (activeEditor) {
             activeEditor.currentTool = 'select';
+            activeEditor.canvas.style.cursor = 'crosshair';
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
             selectTool.classList.add('active');
         }
     });
+
+    // Pan tool button
+    const panTool = document.getElementById('panTool');
+    if (panTool) {
+        panTool.addEventListener('click', () => {
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                activeEditor.currentTool = 'pan';
+                activeEditor.canvas.style.cursor = 'grab';
+                document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+                panTool.classList.add('active');
+            }
+        });
+    }
 
     // Shape tool buttons
     const shapeButtons = document.querySelectorAll('.tool-btn[data-shape]');
@@ -6033,6 +6114,7 @@ function setupSharedUIEvents() {
                 const shape = btn.getAttribute('data-shape');
                 activeEditor.currentTool = 'draw';
                 activeEditor.currentShape = shape;
+                activeEditor.canvas.style.cursor = 'crosshair';
                 document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             }
