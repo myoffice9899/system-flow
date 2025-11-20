@@ -259,6 +259,8 @@ class DiagramEditor {
         document.getElementById('clearCanvas').addEventListener('click', () => {
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
             if (confirm('Clear all shapes and connections?')) {
                 this.shapes = [];
                 this.connections = [];
@@ -278,15 +280,21 @@ class DiagramEditor {
             this.save();
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
         });
         document.getElementById('saveAsFile').addEventListener('click', () => {
             this.saveAs();
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
         });
         document.getElementById('openFile').addEventListener('click', async () => {
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
 
             // Check if File System Access API is supported
             if (window.showOpenFilePicker) {
@@ -305,6 +313,8 @@ class DiagramEditor {
         document.getElementById('browseFolder').addEventListener('click', async () => {
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
             await this.browseFolderAndShowFiles();
         });
 
@@ -327,6 +337,8 @@ class DiagramEditor {
             this.exportToPNG();
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
         });
 
         // Copy Link
@@ -334,18 +346,24 @@ class DiagramEditor {
             this.copyShareLink();
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
         });
 
         document.getElementById('exportMermaid').addEventListener('click', () => {
             this.exportToMermaid();
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
         });
 
         document.getElementById('importMermaid').addEventListener('click', () => {
             this.openMermaidSidebar();
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
+            document.getElementById('recentFilesMenu').style.display = 'none';
+            document.getElementById('folderFilesMenu').style.display = 'none';
         });
 
         // Right sidebar events
@@ -493,96 +511,19 @@ class DiagramEditor {
 
         hamburgerBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            console.log('=== HAMBURGER CLICKED ===');
-
             const isVisible = dropdownMenu.style.display === 'block';
-            console.log('Current visibility:', isVisible);
 
             if (!isVisible) {
                 // Calculate position based on button
                 const rect = hamburgerBtn.getBoundingClientRect();
-                console.log('Hamburger position:', rect);
-
                 dropdownMenu.style.top = (rect.bottom + 4) + 'px';
                 dropdownMenu.style.left = rect.left + 'px';
                 dropdownMenu.style.display = 'block';
-                dropdownMenu.style.zIndex = '9999'; // Force highest z-index for debugging
-                dropdownMenu.style.backgroundColor = 'red'; // Debug: make it very visible
-                dropdownMenu.style.border = '5px solid yellow'; // Debug: bright border
                 hamburgerBtn.classList.add('active');
-
-                console.log('Dropdown menu opened at:', dropdownMenu.style.top, dropdownMenu.style.left);
-                console.log('Dropdown parent:', dropdownMenu.parentElement);
-
-                const dropdownStyle = window.getComputedStyle(dropdownMenu);
-                console.log('Dropdown z-index:', dropdownStyle.zIndex);
-                console.log('Dropdown display:', dropdownStyle.display);
-                console.log('Dropdown visibility:', dropdownStyle.visibility);
-                console.log('Dropdown opacity:', dropdownStyle.opacity);
-                console.log('Dropdown position:', dropdownStyle.position);
-
-                // Check if anything is covering the dropdown
-                const dropdownRect = dropdownMenu.getBoundingClientRect();
-                console.log('Dropdown rect:', dropdownRect);
-                console.log('Dropdown width x height:', dropdownRect.width, 'x', dropdownRect.height);
-                console.log('Dropdown background:', dropdownStyle.backgroundColor);
-                console.log('Dropdown border:', dropdownStyle.border);
-                console.log('Dropdown is in viewport:',
-                    dropdownRect.top >= 0 &&
-                    dropdownRect.left >= 0 &&
-                    dropdownRect.bottom <= window.innerHeight &&
-                    dropdownRect.right <= window.innerWidth
-                );
-
-                // Check menu items
-                const menuItems = dropdownMenu.querySelectorAll('.menu-item');
-                console.log('Number of menu items:', menuItems.length);
-                if (menuItems.length > 0) {
-                    const firstItem = menuItems[0];
-                    const firstItemStyle = window.getComputedStyle(firstItem);
-                    console.log('First menu item:', firstItem.textContent);
-                    console.log('First item display:', firstItemStyle.display);
-                    console.log('First item visibility:', firstItemStyle.visibility);
-                    console.log('First item opacity:', firstItemStyle.opacity);
-                }
-
-                // Check multiple points in dropdown area
-                console.log('Checking elements at dropdown area:');
-                const points = [
-                    {x: dropdownRect.left + 10, y: dropdownRect.top + 10, name: 'top-left'},
-                    {x: dropdownRect.left + 90, y: dropdownRect.top + 50, name: 'center'},
-                    {x: dropdownRect.left + 10, y: dropdownRect.top + 100, name: 'middle-left'}
-                ];
-
-                points.forEach(point => {
-                    const el = document.elementFromPoint(point.x, point.y);
-                    const style = window.getComputedStyle(el);
-                    console.log(`  ${point.name}:`, el.tagName, el.id || el.className,
-                        'z-index:', style.zIndex,
-                        'position:', style.position);
-                });
-
-                const elementAtPoint = document.elementFromPoint(dropdownRect.left + 10, dropdownRect.top + 10);
-                console.log('Main element at dropdown position:', elementAtPoint);
-                console.log('Element z-index:', window.getComputedStyle(elementAtPoint).zIndex);
-                console.log('Is dropdown visible?', elementAtPoint === dropdownMenu || dropdownMenu.contains(elementAtPoint));
-
-                // List all elements with high z-index
-                console.log('All elements with z-index > 1000:');
-                const allElements = document.querySelectorAll('*');
-                allElements.forEach(el => {
-                    const z = window.getComputedStyle(el).zIndex;
-                    if (z !== 'auto' && parseInt(z) > 1000) {
-                        console.log(`  ${el.tagName}#${el.id || el.className}: z-index=${z}`);
-                    }
-                });
             } else {
                 dropdownMenu.style.display = 'none';
                 hamburgerBtn.classList.remove('active');
-                console.log('Dropdown menu closed');
             }
-
-            console.log('=== END HAMBURGER CLICK ===\n');
         });
 
         // Close dropdown when clicking outside
@@ -5457,296 +5398,5 @@ class DiagramEditor {
     }
 }
 
-// Tab Manager Class
-class TabManager {
-    constructor() {
-        this.tabs = new Map();
-        this.activeTabId = 1;
-        this.nextTabId = 2;
-        this.tabsContainer = document.getElementById('tabsContainer');
-        this.newTabBtn = document.getElementById('newTabBtn');
-        this.canvasWrapper = document.getElementById('canvasWrapper');
-
-        // Get the original canvas (no need to create container, canvasWrapper already exists)
-        const originalCanvas = document.getElementById('canvas');
-
-        // Set z-index for original canvas
-        originalCanvas.style.position = 'absolute';
-        originalCanvas.style.top = '0';
-        originalCanvas.style.left = '0';
-        originalCanvas.style.zIndex = '1';
-
-        console.log('Original canvas initialized:', originalCanvas.id);
-        console.log('Original canvas z-index:', originalCanvas.style.zIndex);
-
-        // Create first tab with the main editor using original canvas
-        this.tabs.set(1, {
-            id: 1,
-            name: 'Diagram 1',
-            canvas: originalCanvas,
-            editor: new DiagramEditor(originalCanvas)
-        });
-
-        // Move dropdown menu to body to fix z-index stacking context
-        this.fixDropdownStacking();
-
-        this.bindEvents();
-    }
-
-    fixDropdownStacking() {
-        const dropdownMenu = document.getElementById('dropdownMenu');
-        const recentFilesMenu = document.getElementById('recentFilesMenu');
-        const folderFilesMenu = document.getElementById('folderFilesMenu');
-
-        console.log('=== FIX DROPDOWN STACKING ===');
-
-        [dropdownMenu, recentFilesMenu, folderFilesMenu].forEach(menu => {
-            if (menu && menu.parentElement !== document.body) {
-                console.log(`Moving ${menu.id} to body...`);
-                console.log('Current parent:', menu.parentElement);
-                document.body.appendChild(menu);
-                console.log('New parent:', menu.parentElement);
-            }
-        });
-
-        console.log('=== END FIX STACKING ===\n');
-    }
-
-    bindEvents() {
-        // New tab button
-        this.newTabBtn.addEventListener('click', () => {
-            this.createNewTab();
-        });
-
-        // Handle tab clicks and close buttons
-        this.tabsContainer.addEventListener('click', (e) => {
-            const tab = e.target.closest('.tab');
-            const closeBtn = e.target.closest('.tab-close-btn');
-
-            if (closeBtn && tab) {
-                e.stopPropagation();
-                const tabId = parseInt(tab.dataset.tabId);
-                this.closeTab(tabId);
-            } else if (tab) {
-                const tabId = parseInt(tab.dataset.tabId);
-                this.switchTab(tabId);
-            }
-        });
-
-        // Double-click to rename tab
-        this.tabsContainer.addEventListener('dblclick', (e) => {
-            const tabNameElement = e.target.closest('.tab-name');
-            if (tabNameElement) {
-                const tab = tabNameElement.closest('.tab');
-                const tabId = parseInt(tab.dataset.tabId);
-                this.renameTab(tabId, tabNameElement);
-            }
-        });
-    }
-
-    createNewTab() {
-        const tabId = this.nextTabId++;
-        const tabName = `Diagram ${tabId}`;
-
-        console.log('=== CREATE NEW TAB ===');
-        console.log('Tab ID:', tabId);
-        console.log('Tab Name:', tabName);
-
-        // Create new tab element
-        const tabElement = document.createElement('div');
-        tabElement.className = 'tab';
-        tabElement.dataset.tabId = tabId;
-        tabElement.innerHTML = `
-            <span class="tab-name">${tabName}</span>
-            <button class="tab-close-btn" title="Close tab">×</button>
-        `;
-
-        this.tabsContainer.appendChild(tabElement);
-
-        // Create new canvas for this tab
-        const newCanvas = document.createElement('canvas');
-        newCanvas.id = `canvas-${tabId}`;
-        newCanvas.width = 2000;
-        newCanvas.height = 1500;
-        newCanvas.style.cssText = 'display: none; cursor: crosshair; background: transparent; position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none;';
-        this.canvasWrapper.appendChild(newCanvas);
-
-        console.log('Canvas created:', newCanvas.id);
-        console.log('Canvas style:', newCanvas.style.cssText);
-        console.log('Canvas z-index:', newCanvas.style.zIndex);
-        console.log('Canvas pointer-events:', newCanvas.style.pointerEvents);
-
-        // Create new editor instance with the new canvas
-        const editor = new DiagramEditor(newCanvas);
-
-        // Store tab data
-        this.tabs.set(tabId, {
-            id: tabId,
-            name: tabName,
-            canvas: newCanvas,
-            editor: editor
-        });
-
-        console.log('Total tabs now:', this.tabs.size);
-
-        // Switch to the new tab
-        this.switchTab(tabId);
-
-        // Scroll to show the new tab
-        tabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
-
-        console.log('=== END CREATE TAB ===\n');
-    }
-
-    switchTab(tabId) {
-        if (this.activeTabId === tabId) return;
-
-        const tab = this.tabs.get(tabId);
-        if (!tab) return;
-
-        console.log('=== SWITCH TAB ===');
-        console.log('From tab:', this.activeTabId, '-> To tab:', tabId);
-
-        // Hide ALL canvases first and remove active class
-        console.log('Hiding all canvases...');
-        this.tabs.forEach((t, id) => {
-            if (t.canvas) {
-                t.canvas.classList.remove('active-canvas');
-                t.canvas.style.display = 'none';
-                t.canvas.style.pointerEvents = 'none';
-                console.log(`  Tab ${id} canvas: display=none, pointer-events=none, z-index=${t.canvas.style.zIndex}`);
-            }
-        });
-
-        // Update active tab
-        this.activeTabId = tabId;
-
-        // Show only the active tab's canvas with active class
-        if (tab.canvas) {
-            tab.canvas.classList.add('active-canvas');
-            tab.canvas.style.display = 'block';
-            tab.canvas.style.pointerEvents = 'auto'; // Auto for canvas interaction
-            console.log(`Active tab ${tabId} canvas: display=block, pointer-events=auto, z-index=${tab.canvas.style.zIndex}`);
-        }
-
-        // Update tab UI
-        this.tabsContainer.querySelectorAll('.tab').forEach(t => {
-            if (parseInt(t.dataset.tabId) === tabId) {
-                t.classList.add('active');
-            } else {
-                t.classList.remove('active');
-            }
-        });
-
-        // Check all canvas z-index after switch
-        console.log('All canvases z-index after switch:');
-        this.tabs.forEach((t, id) => {
-            const computed = window.getComputedStyle(t.canvas);
-            console.log(`  Tab ${id}: z-index=${computed.zIndex}, display=${computed.display}, pointer-events=${computed.pointerEvents}`);
-        });
-
-        // Redraw the canvas
-        tab.editor.redraw();
-
-        console.log('=== END SWITCH TAB ===\n');
-    }
-
-    closeTab(tabId) {
-        // Prevent closing the last tab
-        if (this.tabs.size <= 1) {
-            alert('Cannot close the last tab');
-            return;
-        }
-
-        const tab = this.tabs.get(tabId);
-        if (!tab) return;
-
-        // Confirm if tab has content
-        if (tab.editor && (tab.editor.shapes.length > 0 || tab.editor.connections.length > 0)) {
-            if (!confirm(`Close "${tab.name}"? Unsaved changes will be lost.`)) {
-                return;
-            }
-        }
-
-        // Remove tab element
-        const tabElement = this.tabsContainer.querySelector(`[data-tab-id="${tabId}"]`);
-        if (tabElement) {
-            tabElement.remove();
-        }
-
-        // If closing active tab, switch to another tab
-        if (this.activeTabId === tabId) {
-            // Find another tab to switch to
-            const remainingTabs = Array.from(this.tabs.keys()).filter(id => id !== tabId);
-            if (remainingTabs.length > 0) {
-                this.switchTab(remainingTabs[remainingTabs.length - 1]);
-            }
-        }
-
-        // Clean up editor
-        if (tab.editor) {
-            tab.editor.cleanup();
-        }
-
-        // Remove canvas
-        if (tab.canvas && tab.canvas.parentNode) {
-            tab.canvas.parentNode.removeChild(tab.canvas);
-        }
-
-        // Remove from tabs map
-        this.tabs.delete(tabId);
-    }
-
-    renameTab(tabId, tabNameElement) {
-        const tab = this.tabs.get(tabId);
-        if (!tab) return;
-
-        const currentName = tab.name;
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentName;
-        input.style.cssText = `
-            width: ${Math.max(60, currentName.length * 8 + 10)}px;
-            padding: 2px 4px;
-            border: 1px solid #1976d2;
-            border-radius: 3px;
-            font-size: 13px;
-            font-weight: 500;
-            box-sizing: border-box;
-        `;
-
-        tabNameElement.textContent = '';
-        tabNameElement.appendChild(input);
-        input.focus();
-        input.select();
-
-        // Auto-resize input as user types
-        input.addEventListener('input', () => {
-            input.style.width = Math.max(60, input.value.length * 8 + 10) + 'px';
-        });
-
-        const finishRename = () => {
-            const newName = input.value.trim() || currentName;
-            tab.name = newName;
-            tabNameElement.textContent = newName;
-        };
-
-        input.addEventListener('blur', finishRename);
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                finishRename();
-            } else if (e.key === 'Escape') {
-                tabNameElement.textContent = currentName;
-            }
-        });
-    }
-
-    getActiveEditor() {
-        const tab = this.tabs.get(this.activeTabId);
-        return tab ? tab.editor : null;
-    }
-}
-
-// Initialize the tab manager
-const tabManager = new TabManager();
+// Initialize the editor
+const editor = new DiagramEditor();
