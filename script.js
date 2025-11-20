@@ -137,19 +137,7 @@ class DiagramEditor {
         this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
         this.canvas.addEventListener('contextmenu', (e) => this.handleRightClick(e));
 
-        // Tool buttons
-        document.querySelectorAll('.tool-btn[data-shape]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.currentTool = 'draw';
-                this.currentShape = btn.dataset.shape;
-                this.updateActiveButton(btn);
-            });
-        });
-
-        document.getElementById('selectTool').addEventListener('click', () => {
-            this.currentTool = 'select';
-            this.updateActiveButton(document.getElementById('selectTool'));
-        });
+        // Tool buttons (select and shape) are now handled globally in setupSharedUIEvents()
 
         document.getElementById('backButton').addEventListener('click', () => {
             this.exitGroup();
@@ -545,20 +533,7 @@ class DiagramEditor {
             }
         });
 
-        // Comparison mode buttons
-        const viewAsIsBtn = document.getElementById('viewAsIs');
-        const viewToBeBtn = document.getElementById('viewToBe');
-        const exitComparisonBtn = document.getElementById('exitComparison');
-
-        if (viewAsIsBtn) {
-            viewAsIsBtn.addEventListener('click', () => this.loadView('asis'));
-        }
-        if (viewToBeBtn) {
-            viewToBeBtn.addEventListener('click', () => this.loadView('tobe'));
-        }
-        if (exitComparisonBtn) {
-            exitComparisonBtn.addEventListener('click', () => this.exitComparisonMode());
-        }
+        // Comparison mode buttons are now handled globally in setupComparisonToolbar()
 
         // Arrow style and line style selector - auto-apply on change
         const applyArrowChanges = () => {
@@ -1550,17 +1525,16 @@ class DiagramEditor {
     }
 
     showComparisonUI() {
-        // Show comparison toolbar
-        const comparisonToolbar = document.getElementById('comparisonToolbar');
-        if (comparisonToolbar) {
-            comparisonToolbar.style.display = 'flex';
+        // Update comparison toolbar through TabManager
+        if (window.tabManager && window.tabManager.updateComparisonToolbarUI) {
+            window.tabManager.updateComparisonToolbarUI(this);
         }
     }
 
     hideComparisonUI() {
-        const comparisonToolbar = document.getElementById('comparisonToolbar');
-        if (comparisonToolbar) {
-            comparisonToolbar.style.display = 'none';
+        // Update comparison toolbar through TabManager
+        if (window.tabManager && window.tabManager.updateComparisonToolbarUI) {
+            window.tabManager.updateComparisonToolbarUI(this);
         }
     }
 
@@ -1602,17 +1576,9 @@ class DiagramEditor {
         this.updateBreadcrumb();
         this.redraw();
 
-        // Update active button
-        const asIsBtn = document.getElementById('viewAsIs');
-        const toBeBtn = document.getElementById('viewToBe');
-        if (asIsBtn && toBeBtn) {
-            if (view === 'asis') {
-                asIsBtn.classList.add('active');
-                toBeBtn.classList.remove('active');
-            } else {
-                toBeBtn.classList.add('active');
-                asIsBtn.classList.remove('active');
-            }
+        // Update comparison toolbar UI through TabManager
+        if (window.tabManager && window.tabManager.updateComparisonToolbarUI) {
+            window.tabManager.updateComparisonToolbarUI(this);
         }
     }
 
@@ -5688,6 +5654,20 @@ class TabManager {
         // Create new editor instance with the new canvas
         const editor = new DiagramEditor(newCanvas);
 
+        // Sync current tool state from UI to new editor
+        const activeToolBtn = document.querySelector('.tool-btn.active');
+        if (activeToolBtn) {
+            const shapeType = activeToolBtn.getAttribute('data-shape');
+            if (shapeType) {
+                // Shape tool is active
+                editor.currentTool = 'draw';
+                editor.currentShape = shapeType;
+            } else if (activeToolBtn.id === 'selectTool') {
+                // Select tool is active
+                editor.currentTool = 'select';
+            }
+        }
+
         // Store tab data
         this.tabs.set(tabId, {
             editor: editor,
@@ -5732,6 +5712,20 @@ class TabManager {
         // Get new tab data
         const newTab = this.tabs.get(tabId);
 
+        // Sync current tool state from UI to the editor being switched to
+        const activeToolBtn = document.querySelector('.tool-btn.active');
+        if (activeToolBtn) {
+            const shapeType = activeToolBtn.getAttribute('data-shape');
+            if (shapeType) {
+                // Shape tool is active
+                newTab.editor.currentTool = 'draw';
+                newTab.editor.currentShape = shapeType;
+            } else if (activeToolBtn.id === 'selectTool') {
+                // Select tool is active
+                newTab.editor.currentTool = 'select';
+            }
+        }
+
         // Replace canvas
         const oldCanvas = this.canvas;
         const newCanvas = newTab.canvas;
@@ -5742,6 +5736,44 @@ class TabManager {
 
         // Redraw
         newTab.editor.redraw();
+
+        // Refresh layer panel if it's open
+        const layerPanel = document.getElementById('layerPanel');
+        if (layerPanel && layerPanel.style.display === 'flex') {
+            newTab.editor.renderLayerList();
+        }
+
+        // Update comparison toolbar UI based on editor's state
+        this.updateComparisonToolbarUI(newTab.editor);
+    }
+
+    updateComparisonToolbarUI(editor) {
+        const comparisonToolbar = document.getElementById('comparisonToolbar');
+        const viewAsIsBtn = document.getElementById('viewAsIs');
+        const viewToBeBtn = document.getElementById('viewToBe');
+
+        if (editor.comparisonMode) {
+            // Show comparison toolbar
+            if (comparisonToolbar) {
+                comparisonToolbar.style.display = 'flex';
+            }
+
+            // Update active button based on current view
+            if (viewAsIsBtn && viewToBeBtn) {
+                if (editor.currentView === 'asis') {
+                    viewAsIsBtn.classList.add('active');
+                    viewToBeBtn.classList.remove('active');
+                } else {
+                    viewAsIsBtn.classList.remove('active');
+                    viewToBeBtn.classList.add('active');
+                }
+            }
+        } else {
+            // Hide comparison toolbar
+            if (comparisonToolbar) {
+                comparisonToolbar.style.display = 'none';
+            }
+        }
     }
 
     closeTab(tabId) {
@@ -5866,7 +5898,36 @@ function setupSharedUIEvents() {
         }
     });
 
-    // Layer panel toggle (shared across all tabs)
+    // Global tool button handlers (work with active editor)
+    const selectTool = document.getElementById('selectTool');
+    selectTool.addEventListener('click', () => {
+        const activeEditor = window.tabManager?.getActiveEditor();
+        if (activeEditor) {
+            activeEditor.currentTool = 'select';
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            selectTool.classList.add('active');
+        }
+    });
+
+    // Shape tool buttons
+    const shapeButtons = document.querySelectorAll('.tool-btn[data-shape]');
+    shapeButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                const shape = btn.getAttribute('data-shape');
+                activeEditor.currentTool = 'draw';
+                activeEditor.currentShape = shape;
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            }
+        });
+    });
+
+}
+
+// Global layer panel management (UI only - data comes from active tab)
+function setupLayerPanel() {
     const layerToggleBtn = document.getElementById('layerToggleBtn');
     const layerPanel = document.getElementById('layerPanel');
 
@@ -5877,8 +5938,23 @@ function setupSharedUIEvents() {
     newLayerToggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isVisible = layerPanel.style.display === 'flex';
-        layerPanel.style.display = isVisible ? 'none' : 'flex';
-        newLayerToggleBtn.classList.toggle('active', !isVisible);
+
+        if (!isVisible) {
+            // Show panel and refresh with current tab's layers
+            layerPanel.style.display = 'flex';
+            newLayerToggleBtn.classList.add('active');
+
+            // Get active editor and refresh layer panel
+            if (window.tabManager && window.tabManager.getActiveEditor) {
+                const activeEditor = window.tabManager.getActiveEditor();
+                if (activeEditor) {
+                    activeEditor.renderLayerList();
+                }
+            }
+        } else {
+            layerPanel.style.display = 'none';
+            newLayerToggleBtn.classList.remove('active');
+        }
     });
 
     // Close layer panel when clicking outside
@@ -5890,6 +5966,54 @@ function setupSharedUIEvents() {
     });
 }
 
+// Global comparison toolbar management (UI only - data comes from active tab)
+function setupComparisonToolbar() {
+    const viewAsIsBtn = document.getElementById('viewAsIs');
+    const viewToBeBtn = document.getElementById('viewToBe');
+    const exitComparisonBtn = document.getElementById('exitComparison');
+
+    if (viewAsIsBtn) {
+        // Remove existing listeners by cloning
+        const newViewAsIsBtn = viewAsIsBtn.cloneNode(true);
+        viewAsIsBtn.parentNode.replaceChild(newViewAsIsBtn, viewAsIsBtn);
+
+        newViewAsIsBtn.addEventListener('click', () => {
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                activeEditor.loadView('asis');
+            }
+        });
+    }
+
+    if (viewToBeBtn) {
+        // Remove existing listeners by cloning
+        const newViewToBeBtn = viewToBeBtn.cloneNode(true);
+        viewToBeBtn.parentNode.replaceChild(newViewToBeBtn, viewToBeBtn);
+
+        newViewToBeBtn.addEventListener('click', () => {
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                activeEditor.loadView('tobe');
+            }
+        });
+    }
+
+    if (exitComparisonBtn) {
+        // Remove existing listeners by cloning
+        const newExitComparisonBtn = exitComparisonBtn.cloneNode(true);
+        exitComparisonBtn.parentNode.replaceChild(newExitComparisonBtn, exitComparisonBtn);
+
+        newExitComparisonBtn.addEventListener('click', () => {
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                activeEditor.exitComparisonMode();
+            }
+        });
+    }
+}
+
 // Initialize
 setupSharedUIEvents();
-const tabManager = new TabManager();
+setupLayerPanel();
+setupComparisonToolbar();
+window.tabManager = new TabManager();
