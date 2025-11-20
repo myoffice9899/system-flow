@@ -211,6 +211,18 @@ class DiagramEditor {
                     e.preventDefault();
                     this.selectAll();
                 }
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+                // Zoom In (Ctrl+= or Ctrl++)
+                e.preventDefault();
+                this.zoomIn();
+            } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+                // Zoom Out (Ctrl+-)
+                e.preventDefault();
+                this.zoomOut();
+            } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+                // Reset Zoom (Ctrl+0)
+                e.preventDefault();
+                this.resetZoom();
             }
         });
 
@@ -432,13 +444,15 @@ class DiagramEditor {
             exitComparisonBtn.addEventListener('click', () => this.exitComparisonMode());
         }
 
-        // Arrow style selector - auto-apply on change
+        // Arrow style and line style selector - auto-apply on change
         const applyArrowChanges = () => {
             if (this.contextMenuConnection) {
                 const startType = document.getElementById('startArrowType').value;
                 const endType = document.getElementById('endArrowType').value;
+                const lineStyle = document.getElementById('lineStyleType').value;
                 this.contextMenuConnection.startArrow = startType;
                 this.contextMenuConnection.endArrow = endType;
+                this.contextMenuConnection.lineStyle = lineStyle;
                 this.saveState();
                 this.redraw();
             }
@@ -446,6 +460,7 @@ class DiagramEditor {
 
         document.getElementById('startArrowType').addEventListener('change', applyArrowChanges);
         document.getElementById('endArrowType').addEventListener('change', applyArrowChanges);
+        document.getElementById('lineStyleType').addEventListener('change', applyArrowChanges);
 
         // Hide arrow selector when clicking outside
         document.addEventListener('click', (e) => {
@@ -478,6 +493,17 @@ class DiagramEditor {
                 dropdownMenu.style.display = 'none';
                 hamburgerBtn.classList.remove('active');
             }
+        });
+
+        // Layer dropdown toggle (only toggle with button, stays open otherwise)
+        const layerToggleBtn = document.getElementById('layerToggleBtn');
+        const layerPanel = document.getElementById('layerPanel');
+
+        layerToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = layerPanel.style.display === 'flex';
+            layerPanel.style.display = isVisible ? 'none' : 'flex';
+            layerToggleBtn.classList.toggle('active', !isVisible);
         });
 
         // Zoom controls
@@ -1007,6 +1033,7 @@ class DiagramEditor {
             arrowStyleSection.style.display = 'block';
             document.getElementById('startArrowType').value = connection.startArrow || 'none';
             document.getElementById('endArrowType').value = connection.endArrow || 'arrow';
+            document.getElementById('lineStyleType').value = connection.lineStyle || 'solid';
 
             // Store reference to connection being styled
             this.hoveredConnection = connection;
@@ -1301,20 +1328,7 @@ class DiagramEditor {
         const shapesToCopy = this.currentGroup === null ? this.shapes : this.rootShapes;
         const connectionsToCopy = this.currentGroup === null ? this.connections : this.rootConnections;
 
-        // Save As-Is data
-        this.asIsData = {
-            shapes: shapesToCopy,
-            connections: connectionsToCopy,
-            rootShapes: [...this.rootShapes],
-            rootConnections: [...this.rootConnections],
-            currentGroup: this.currentGroup,
-            groupPath: [...this.groupPath]
-        };
-
-        // Create To-Be data (deep clone)
-        const clonedShapes = shapesToCopy.map(shape => deepCloneShape(shape));
-
-        // Restore connections with cloned shapes
+        // Helper function to restore connections with cloned shapes
         const restoreConnections = (originalShapes, clonedShapes, originalConnections) => {
             return originalConnections.map(conn => {
                 const fromIndex = originalShapes.indexOf(conn.from);
@@ -1323,12 +1337,15 @@ class DiagramEditor {
                     from: clonedShapes[fromIndex],
                     to: clonedShapes[toIndex],
                     type: conn.type,
-                    label: conn.label || ''
+                    label: conn.label || '',
+                    name: conn.name || '',
+                    note: conn.note || '',
+                    startArrow: conn.startArrow || 'none',
+                    endArrow: conn.endArrow || 'arrow',
+                    lineStyle: conn.lineStyle || 'solid'
                 };
             });
         };
-
-        const clonedConnections = restoreConnections(shapesToCopy, clonedShapes, connectionsToCopy);
 
         // Restore child connections recursively
         const restoreChildConnections = (originalShape, clonedShape) => {
@@ -1340,7 +1357,12 @@ class DiagramEditor {
                         from: clonedShape.children[fromIndex],
                         to: clonedShape.children[toIndex],
                         type: conn.type,
-                        label: conn.label || ''
+                        label: conn.label || '',
+                        name: conn.name || '',
+                        note: conn.note || '',
+                        startArrow: conn.startArrow || 'none',
+                        endArrow: conn.endArrow || 'arrow',
+                        lineStyle: conn.lineStyle || 'solid'
                     };
                 });
             }
@@ -1353,6 +1375,28 @@ class DiagramEditor {
                 });
             }
         };
+
+        // Create As-Is data (deep clone to preserve original state)
+        const asIsClonedShapes = shapesToCopy.map(shape => deepCloneShape(shape));
+        const asIsClonedConnections = restoreConnections(shapesToCopy, asIsClonedShapes, connectionsToCopy);
+
+        // Restore child connections for As-Is
+        asIsClonedShapes.forEach((clonedShape, index) => {
+            restoreChildConnections(shapesToCopy[index], clonedShape);
+        });
+
+        this.asIsData = {
+            shapes: asIsClonedShapes,
+            connections: asIsClonedConnections,
+            rootShapes: asIsClonedShapes,
+            rootConnections: asIsClonedConnections,
+            currentGroup: this.currentGroup,
+            groupPath: [...this.groupPath]
+        };
+
+        // Create To-Be data (deep clone)
+        const clonedShapes = shapesToCopy.map(shape => deepCloneShape(shape));
+        const clonedConnections = restoreConnections(shapesToCopy, clonedShapes, connectionsToCopy);
 
         clonedShapes.forEach((clonedShape, index) => {
             restoreChildConnections(shapesToCopy[index], clonedShape);
@@ -1398,19 +1442,19 @@ class DiagramEditor {
         // Save current view before switching
         if (this.comparisonMode) {
             if (this.currentView === 'asis' && this.asIsData) {
-                this.asIsData.shapes = [...this.shapes];
-                this.asIsData.connections = [...this.connections];
-                this.asIsData.rootShapes = [...this.rootShapes];
-                this.asIsData.rootConnections = [...this.rootConnections];
+                this.asIsData.shapes = this.shapes;
+                this.asIsData.connections = this.connections;
+                this.asIsData.rootShapes = this.rootShapes;
+                this.asIsData.rootConnections = this.rootConnections;
                 this.asIsData.currentGroup = this.currentGroup;
-                this.asIsData.groupPath = [...this.groupPath];
+                this.asIsData.groupPath = this.groupPath;
             } else if (this.currentView === 'tobe' && this.toBeData) {
-                this.toBeData.shapes = [...this.shapes];
-                this.toBeData.connections = [...this.connections];
-                this.toBeData.rootShapes = [...this.rootShapes];
-                this.toBeData.rootConnections = [...this.rootConnections];
+                this.toBeData.shapes = this.shapes;
+                this.toBeData.connections = this.connections;
+                this.toBeData.rootShapes = this.rootShapes;
+                this.toBeData.rootConnections = this.rootConnections;
                 this.toBeData.currentGroup = this.currentGroup;
-                this.toBeData.groupPath = [...this.groupPath];
+                this.toBeData.groupPath = this.groupPath;
             }
         }
 
@@ -1419,12 +1463,12 @@ class DiagramEditor {
         const data = view === 'asis' ? this.asIsData : this.toBeData;
 
         if (data) {
-            this.shapes = [...data.shapes];
-            this.connections = [...data.connections];
-            this.rootShapes = [...data.rootShapes];
-            this.rootConnections = [...data.rootConnections];
+            this.shapes = data.shapes;
+            this.connections = data.connections;
+            this.rootShapes = data.rootShapes;
+            this.rootConnections = data.rootConnections;
             this.currentGroup = data.currentGroup;
-            this.groupPath = data.groupPath ? [...data.groupPath] : [];
+            this.groupPath = data.groupPath || [];
         }
 
         this.selectedShape = null;
@@ -2563,10 +2607,23 @@ class DiagramEditor {
             const cpX = (fromX + toX) / 2 + perpX;
             const cpY = (fromY + toY) / 2 + perpY;
 
+            // Apply line style
+            const lineStyle = conn.lineStyle || 'solid';
+            if (lineStyle === 'dashed') {
+                this.ctx.setLineDash([10, 5]);
+            } else if (lineStyle === 'dotted') {
+                this.ctx.setLineDash([2, 3]);
+            } else {
+                this.ctx.setLineDash([]);
+            }
+
             this.ctx.beginPath();
             this.ctx.moveTo(fromX, fromY);
             this.ctx.quadraticCurveTo(cpX, cpY, toX, toY);
             this.ctx.stroke();
+
+            // Reset line dash
+            this.ctx.setLineDash([]);
 
             // Draw arrows using helper function
             const endAngle = Math.atan2(toY - cpY, toX - cpX);
@@ -2600,11 +2657,25 @@ class DiagramEditor {
                 this.ctx.stroke();
             }
         } else {
-            // Draw straight line
+            // Draw straight line with line style
+            const lineStyle = conn.lineStyle || 'solid';
+
+            // Set line dash pattern based on style
+            if (lineStyle === 'dashed') {
+                this.ctx.setLineDash([10, 5]); // 10px line, 5px gap
+            } else if (lineStyle === 'dotted') {
+                this.ctx.setLineDash([2, 3]); // 2px dot, 3px gap
+            } else {
+                this.ctx.setLineDash([]); // Solid line
+            }
+
             this.ctx.beginPath();
             this.ctx.moveTo(fromX, fromY);
             this.ctx.lineTo(toX, toY);
             this.ctx.stroke();
+
+            // Reset line dash
+            this.ctx.setLineDash([]);
 
             // Draw arrows using helper function
             const angle = Math.atan2(toY - fromY, toX - fromX);
@@ -2927,13 +2998,17 @@ class DiagramEditor {
             return zIndexA - zIndexB;
         });
 
-        // Draw connections first (only for visible layers)
+        // Draw connections first (only for visible layers or no layer)
         this.connections.forEach(conn => {
-            // Check if both shapes are on visible layers
+            // Check if both shapes are on visible layers or have no layer
             const fromLayer = this.layers.find(l => l.id === conn.from.layerId);
             const toLayer = this.layers.find(l => l.id === conn.to.layerId);
 
-            if ((!fromLayer || fromLayer.visible) && (!toLayer || toLayer.visible)) {
+            // Draw if no layer assigned OR layer exists and is visible
+            const fromVisible = !conn.from.layerId || !fromLayer || fromLayer.visible;
+            const toVisible = !conn.to.layerId || !toLayer || toLayer.visible;
+
+            if (fromVisible && toVisible) {
                 // Highlight connections in Impact Analysis mode
                 if (this.impactAnalysisMode && this.impactTargets.length > 0) {
                     const isUpstream = this.impactUpstream.includes(conn.from) &&
@@ -2949,11 +3024,15 @@ class DiagramEditor {
             }
         });
 
-        // Draw shapes (sorted by layer z-index, only visible layers)
+        // Draw shapes (sorted by layer z-index, only visible layers or no layer)
         sortedShapes.forEach(shape => {
-            // Check if shape's layer is visible
+            // Check if shape's layer is visible or has no layer
             const layer = this.layers.find(l => l.id === shape.layerId);
-            if (!layer || !layer.visible) return;
+
+            // Draw if no layer assigned OR layer exists and is visible
+            if (shape.layerId && layer && !layer.visible) {
+                return; // Skip only if has layer and it's not visible
+            }
 
             const isSelected = shape === this.selectedShape || this.selectedShapes.includes(shape);
 

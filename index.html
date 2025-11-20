@@ -121,10 +121,19 @@
                 <button class="zoom-btn" id="zoomIn" title="Zoom in">+</button>
                 <button class="zoom-btn" id="zoomReset" title="Reset zoom">⊙</button>
             </div>
+
+            <!-- Layer Toggle Button -->
+            <button class="layer-toggle-btn" id="layerToggleBtn" title="Layers">
+                <svg width="20" height="20" viewBox="0 0 20 20">
+                    <path d="M 10 3 L 17 6 L 17 10 L 10 13 L 3 10 L 3 6 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M 3 10 L 10 13 L 17 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M 3 13 L 10 16 L 17 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
         </div>
 
-        <!-- Left Sidebar - Layer Panel -->
-        <div class="left-sidebar" id="layerPanel">
+        <!-- Layer Panel Dropdown -->
+        <div class="layer-dropdown-menu" id="layerPanel" style="display: none;">
             <div class="layer-panel-header">
                 <h3>Layers</h3>
                 <button class="add-layer-btn" id="addLayerBtn" title="Add new layer">+</button>
@@ -194,7 +203,7 @@
                 <div class="context-menu-item" data-action="splitLine">Split Line</div>
                 <div id="arrowStyleInMenu" style="padding: 8px 12px; display: none;">
                     <div style="font-weight: bold; margin-bottom: 6px; color: #333; font-size: 12px;">Arrow Style</div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
                         <span style="font-size: 11px; color: #666;">Start:</span>
                         <select id="startArrowType" style="flex: 1; padding: 3px; border: 1px solid #ddd; border-radius: 3px; font-size: 14px;">
                             <option value="none">—</option>
@@ -210,6 +219,12 @@
                             <option value="diamond">◇</option>
                         </select>
                     </div>
+                    <div style="font-weight: bold; margin-bottom: 6px; color: #333; font-size: 12px;">Line Style</div>
+                    <select id="lineStyleType" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 3px; font-size: 14px;">
+                        <option value="solid" selected>โ Solid</option>
+                        <option value="dashed">โโโ Dashed</option>
+                        <option value="dotted">โโโโ Dotted</option>
+                    </select>
                 </div>
             </div>
 
