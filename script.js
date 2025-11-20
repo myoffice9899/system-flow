@@ -140,6 +140,11 @@ class DiagramEditor {
         // Tool buttons (select and shape) are now handled globally in setupSharedUIEvents()
 
         document.getElementById('backButton').addEventListener('click', () => {
+            // Don't allow exiting group in To-Be mode
+            if (this.comparisonMode && this.currentView === 'tobe') {
+                alert('Cannot navigate detailed view in To-Be mode. Please switch to As-Is view first.');
+                return;
+            }
             this.exitGroup();
         });
 
@@ -165,6 +170,27 @@ class DiagramEditor {
                 // Only allow Escape to exit Impact Analysis mode
                 if (e.key === 'Escape') {
                     this.closeImpactAnalysis();
+                }
+                return;
+            }
+
+            // Disable all modification shortcuts in As-Is comparison mode (read-only)
+            if (this.comparisonMode && this.currentView === 'asis') {
+                // Only allow view navigation shortcuts (zoom, escape)
+                if (e.key === 'Escape') {
+                    this.selectedShape = null;
+                    this.selectedShapes = [];
+                    this.selectedConnections = [];
+                    this.redraw();
+                } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+                    e.preventDefault();
+                    this.zoomIn();
+                } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+                    e.preventDefault();
+                    this.zoomOut();
+                } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+                    e.preventDefault();
+                    this.resetZoom();
                 }
                 return;
             }
@@ -234,6 +260,12 @@ class DiagramEditor {
 
         // Property inputs
         document.getElementById('fillColor').addEventListener('change', (e) => {
+            // Disable in As-Is comparison mode
+            if (this.comparisonMode && this.currentView === 'asis') {
+                alert('Cannot edit in As-Is mode. Switch to To-Be to make changes.');
+                e.target.value = this.selectedShape?.fillColor || this.fillColor;
+                return;
+            }
             this.fillColor = e.target.value;
             if (this.selectedShape) {
                 this.selectedShape.fillColor = e.target.value;
@@ -242,6 +274,12 @@ class DiagramEditor {
         });
 
         document.getElementById('strokeColor').addEventListener('change', (e) => {
+            // Disable in As-Is comparison mode
+            if (this.comparisonMode && this.currentView === 'asis') {
+                alert('Cannot edit in As-Is mode. Switch to To-Be to make changes.');
+                e.target.value = this.selectedShape?.strokeColor || this.strokeColor;
+                return;
+            }
             this.strokeColor = e.target.value;
             if (this.selectedShape) {
                 this.selectedShape.strokeColor = e.target.value;
@@ -250,6 +288,12 @@ class DiagramEditor {
         });
 
         document.getElementById('strokeWidth').addEventListener('change', (e) => {
+            // Disable in As-Is comparison mode
+            if (this.comparisonMode && this.currentView === 'asis') {
+                alert('Cannot edit in As-Is mode. Switch to To-Be to make changes.');
+                e.target.value = this.selectedShape?.strokeWidth || this.strokeWidth;
+                return;
+            }
             this.strokeWidth = parseInt(e.target.value);
             if (this.selectedShape) {
                 this.selectedShape.strokeWidth = parseInt(e.target.value);
@@ -622,6 +666,12 @@ class DiagramEditor {
             return;
         }
 
+        // Disable all interactions in As-Is comparison mode (read-only)
+        if (this.comparisonMode && this.currentView === 'asis') {
+            // Only allow viewing, no editing or creating
+            return;
+        }
+
         if (this.currentTool === 'draw') {
             // Check if clicking on connection midpoint FIRST (highest priority)
             const connection = this.getConnectionMidpointAt(pos);
@@ -924,6 +974,12 @@ class DiagramEditor {
         // Disable editing in Impact Analysis mode
         if (this.impactAnalysisMode) return;
 
+        // Disable editing in comparison mode (both As-Is and To-Be are read-only for text)
+        if (this.comparisonMode) {
+            alert('Cannot edit text in comparison mode. Exit comparison mode to make changes.');
+            return;
+        }
+
         const pos = this.getMousePos(e);
         const shape = this.getShapeAt(pos);
         const connection = !shape ? this.getConnectionAt(pos) : null;
@@ -1105,13 +1161,29 @@ class DiagramEditor {
         const shapeSeparator = document.getElementById('shapeSeparator');
         const connectionSeparator = document.getElementById('connectionSeparator');
 
+        // Check if in comparison mode
+        const isAsIsMode = this.comparisonMode && this.currentView === 'asis';
+        const isToBeMode = this.comparisonMode && this.currentView === 'tobe';
+
+        // In As-Is mode, don't show context menu at all (read-only)
+        if (isAsIsMode) {
+            return; // Don't show menu
+        }
+
         // Show/hide menu items based on context
         if (shape) {
             // Shape context menu
-            enterGroupItem.style.display = 'block';
-            importItem.style.display = 'block';
+            // In To-Be mode, disable certain actions
+            if (isToBeMode) {
+                enterGroupItem.style.display = 'none';  // No detailed view in To-Be
+                importItem.style.display = 'none';      // No import in To-Be
+                createToBeItem.style.display = 'none';  // Can't create To-Be from To-Be
+            } else {
+                enterGroupItem.style.display = 'block';
+                importItem.style.display = 'block';
+                createToBeItem.style.display = 'block';
+            }
             deleteItem.style.display = 'block';
-            createToBeItem.style.display = 'block';
             shapeSeparator.style.display = 'block';
             splitLineItem.style.display = 'none';
             arrowStyleSection.style.display = 'none';
@@ -3190,6 +3262,12 @@ class DiagramEditor {
     enterGroup(group) {
         if (!group) return;
 
+        // Don't allow entering detailed view in To-Be mode
+        if (this.comparisonMode && this.currentView === 'tobe') {
+            alert('Cannot enter detailed view in To-Be mode. Please switch to As-Is view first.');
+            return;
+        }
+
         // Initialize children arrays if they don't exist
         if (!group.children) group.children = [];
         if (!group.childConnections) group.childConnections = [];
@@ -3311,6 +3389,9 @@ class DiagramEditor {
         const breadcrumb = document.getElementById('breadcrumb');
         breadcrumb.innerHTML = '';
 
+        // Check if in To-Be mode (breadcrumb navigation disabled)
+        const isToBeMode = this.comparisonMode && this.currentView === 'tobe';
+
         // Root level
         const rootItem = document.createElement('span');
         rootItem.className = 'breadcrumb-item';
@@ -3318,12 +3399,17 @@ class DiagramEditor {
         rootItem.dataset.level = 'root';
         if (this.groupPath.length === 0) {
             rootItem.classList.add('active');
-        } else {
+        } else if (!isToBeMode) {
+            // Only allow navigation if not in To-Be mode
             rootItem.addEventListener('click', () => {
                 while (this.groupPath.length > 0) {
                     this.exitGroup();
                 }
             });
+        } else {
+            // In To-Be mode, add disabled style
+            rootItem.style.cursor = 'not-allowed';
+            rootItem.style.opacity = '0.5';
         }
         breadcrumb.appendChild(rootItem);
 
@@ -3335,13 +3421,18 @@ class DiagramEditor {
 
             if (index === this.groupPath.length - 1) {
                 item.classList.add('active');
-            } else {
+            } else if (!isToBeMode) {
+                // Only allow navigation if not in To-Be mode
                 item.addEventListener('click', () => {
                     const stepsBack = this.groupPath.length - index - 1;
                     for (let i = 0; i < stepsBack; i++) {
                         this.exitGroup();
                     }
                 });
+            } else {
+                // In To-Be mode, add disabled style
+                item.style.cursor = 'not-allowed';
+                item.style.opacity = '0.5';
             }
             breadcrumb.appendChild(item);
         });
@@ -5749,8 +5840,11 @@ class TabManager {
 
     updateComparisonToolbarUI(editor) {
         const comparisonToolbar = document.getElementById('comparisonToolbar');
+        const comparisonWarning = document.getElementById('comparisonWarning');
         const viewAsIsBtn = document.getElementById('viewAsIs');
         const viewToBeBtn = document.getElementById('viewToBe');
+        const layerPanel = document.getElementById('layerPanel');
+        const layerToggleBtn = document.getElementById('layerToggleBtn');
 
         if (editor.comparisonMode) {
             // Show comparison toolbar
@@ -5763,15 +5857,36 @@ class TabManager {
                 if (editor.currentView === 'asis') {
                     viewAsIsBtn.classList.add('active');
                     viewToBeBtn.classList.remove('active');
+
+                    // Show warning banner for As-Is (read-only)
+                    if (comparisonWarning) {
+                        comparisonWarning.style.display = 'flex';
+                    }
                 } else {
                     viewAsIsBtn.classList.remove('active');
                     viewToBeBtn.classList.add('active');
+
+                    // Hide warning banner for To-Be (editable)
+                    if (comparisonWarning) {
+                        comparisonWarning.style.display = 'none';
+                    }
+
+                    // Close layer panel when switching to To-Be
+                    if (layerPanel) {
+                        layerPanel.style.display = 'none';
+                    }
+                    if (layerToggleBtn) {
+                        layerToggleBtn.classList.remove('active');
+                    }
                 }
             }
         } else {
-            // Hide comparison toolbar
+            // Hide comparison toolbar and warning
             if (comparisonToolbar) {
                 comparisonToolbar.style.display = 'none';
+            }
+            if (comparisonWarning) {
+                comparisonWarning.style.display = 'none';
             }
         }
     }
@@ -5937,6 +6052,14 @@ function setupLayerPanel() {
 
     newLayerToggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+
+        // Check if in comparison mode (both As-Is and To-Be)
+        const activeEditor = window.tabManager?.getActiveEditor();
+        if (activeEditor && activeEditor.comparisonMode) {
+            alert('Layer panel is not available in comparison mode. Exit comparison mode to manage layers.');
+            return;
+        }
+
         const isVisible = layerPanel.style.display === 'flex';
 
         if (!isVisible) {
@@ -5945,11 +6068,8 @@ function setupLayerPanel() {
             newLayerToggleBtn.classList.add('active');
 
             // Get active editor and refresh layer panel
-            if (window.tabManager && window.tabManager.getActiveEditor) {
-                const activeEditor = window.tabManager.getActiveEditor();
-                if (activeEditor) {
-                    activeEditor.renderLayerList();
-                }
+            if (activeEditor) {
+                activeEditor.renderLayerList();
             }
         } else {
             layerPanel.style.display = 'none';

@@ -469,6 +469,28 @@ body {
     gap: 8px;
 }
 
+/* Comparison Warning Banner */
+.comparison-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #fff3cd;
+    border-top: 1px solid #ffc107;
+    color: #856404;
+    font-size: 13px;
+    font-weight: 500;
+    position: fixed;
+    bottom: 36px; /* Above bottom tab bar (36px height) */
+    left: 0;
+    right: 0;
+    z-index: 900;
+}
+
+.comparison-warning svg {
+    color: #ffc107;
+}
+
 .comparison-btn {
     background: white;
     border: 2px solid #ff9800;
