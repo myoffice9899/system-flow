@@ -1,0 +1,9 @@
+flowchart LR
+    A[Start Process] --> B(Validate Input)
+    B --> C{Is Valid?}
+    C -->|Yes| D[Process Data]
+    C -->|No| E[Show Error]
+    D --> F[Save to Database]
+    E --> B
+    F --> G[Send Notification]
+    G --> H[End]
