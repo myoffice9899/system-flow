@@ -76,6 +76,8 @@ class DiagramEditor {
         this.impactTargets = []; // Changed to array for multi-selection
         this.impactUpstream = [];
         this.impactDownstream = [];
+        this.savedSelectedShape = undefined;
+        this.savedSelectedShapes = undefined;
 
         // Mermaid layout direction
         this.mermaidLayoutDirection = 'LR'; // Default to Left-Right
@@ -648,23 +650,6 @@ class DiagramEditor {
 
     handleMouseMove(e) {
         const pos = this.getMousePos(e);
-
-        // In Impact Analysis mode, show tooltip on hover
-        if (this.impactAnalysisMode) {
-            const shape = this.getShapeAt(pos);
-            const tooltip = document.getElementById('impactAnalysisTooltip');
-
-            if (shape && !shape.isContextBox && !this.impactTargets.includes(shape)) {
-                // Show tooltip for hoverable shapes not yet selected
-                const screenPos = this.canvasToScreen(pos.x, pos.y);
-                tooltip.style.left = (screenPos.x + 15) + 'px';
-                tooltip.style.top = (screenPos.y + 15) + 'px';
-                tooltip.style.display = 'block';
-            } else {
-                tooltip.style.display = 'none';
-            }
-            return;
-        }
 
         if (this.isDrawing && this.currentTool === 'draw') {
             this.redraw();
@@ -1837,21 +1822,21 @@ class DiagramEditor {
     }
 
     drawShape(shape, isSelected = false, impactType = null) {
-        // Apply impact analysis highlighting
+        // Apply impact analysis highlighting with modern colors
         if (impactType) {
             if (impactType === 'target') {
-                this.ctx.shadowColor = 'rgba(33, 150, 243, 0.6)';
-                this.ctx.shadowBlur = 20;
+                this.ctx.shadowColor = 'rgba(168, 85, 247, 0.7)';
+                this.ctx.shadowBlur = 24;
                 this.ctx.shadowOffsetX = 0;
                 this.ctx.shadowOffsetY = 0;
             } else if (impactType === 'upstream') {
-                this.ctx.shadowColor = 'rgba(255, 152, 0, 0.5)';
-                this.ctx.shadowBlur = 15;
+                this.ctx.shadowColor = 'rgba(59, 130, 246, 0.6)';
+                this.ctx.shadowBlur = 18;
                 this.ctx.shadowOffsetX = 0;
                 this.ctx.shadowOffsetY = 0;
             } else if (impactType === 'downstream') {
-                this.ctx.shadowColor = 'rgba(244, 67, 54, 0.5)';
-                this.ctx.shadowBlur = 15;
+                this.ctx.shadowColor = 'rgba(236, 72, 153, 0.6)';
+                this.ctx.shadowBlur = 18;
                 this.ctx.shadowOffsetX = 0;
                 this.ctx.shadowOffsetY = 0;
             }
@@ -1868,16 +1853,15 @@ class DiagramEditor {
         this.ctx.strokeStyle = (this.modernMode && shape.strokeColor === '#000000') ? '#4a5568' : shape.strokeColor;
         this.ctx.lineWidth = shape.strokeWidth;
 
-        // Thicker border for impact analysis
+        // Change border color for impact analysis (without making it thicker)
         if (impactType) {
-            this.ctx.lineWidth = shape.strokeWidth + 3;
             if (impactType === 'target') {
-                // Red border for target shapes
-                this.ctx.strokeStyle = '#f44336';
+                // Purple border for target shapes
+                this.ctx.strokeStyle = '#a855f7';
             } else if (impactType === 'upstream') {
-                this.ctx.strokeStyle = '#ff9800';
+                this.ctx.strokeStyle = '#3b82f6';
             } else if (impactType === 'downstream') {
-                this.ctx.strokeStyle = '#f44336';
+                this.ctx.strokeStyle = '#ec4899';
             }
         }
 
@@ -2487,15 +2471,15 @@ class DiagramEditor {
         // Check if there's a reverse connection (bidirectional)
         const hasReverse = this.connections.some(c => c.from === to && c.to === from);
 
-        // Apply impact analysis styling
+        // Apply impact analysis styling with modern colors
         if (isUpstream || isDownstream || isTargetConnection) {
-            this.ctx.lineWidth = 3;
+            this.ctx.lineWidth = 4;
             if (isTargetConnection) {
-                this.ctx.strokeStyle = '#2196f3';
+                this.ctx.strokeStyle = '#a855f7';
             } else if (isUpstream) {
-                this.ctx.strokeStyle = '#ff9800';
+                this.ctx.strokeStyle = '#3b82f6';
             } else if (isDownstream) {
-                this.ctx.strokeStyle = '#f44336';
+                this.ctx.strokeStyle = '#ec4899';
             }
         }
 
@@ -3759,6 +3743,12 @@ class DiagramEditor {
         const panel = document.getElementById('impactPanel');
 
         if (this.impactAnalysisMode) {
+            // Save current selection state before entering Impact Analysis (only if not already saved)
+            if (this.savedSelectedShape === undefined && this.savedSelectedShapes === undefined) {
+                this.savedSelectedShape = this.selectedShape;
+                this.savedSelectedShapes = this.selectedShapes ? [...this.selectedShapes] : [];
+            }
+
             // Enable Modern Mode automatically when entering Impact Analysis
             if (!this.modernMode) {
                 this.modernMode = true;
@@ -3772,6 +3762,10 @@ class DiagramEditor {
                 this.finishTextEditing();
             }
 
+            // Clear selections when entering Impact Analysis mode
+            this.selectedShape = null;
+            this.selectedShapes = [];
+
             btn.classList.add('active');
             // Don't show panel immediately - wait for user to click a shape
             // panel.style.display = 'block';
@@ -3784,6 +3778,16 @@ class DiagramEditor {
             // Switch to select tool for better UX
             this.currentTool = 'select';
             this.updateActiveButton(document.getElementById('selectTool'));
+
+            // Show tooltip for 2 seconds then fade out
+            const tooltip = document.getElementById('impactAnalysisTooltip');
+            tooltip.classList.remove('fade-out');
+            tooltip.classList.add('show');
+
+            setTimeout(() => {
+                tooltip.classList.add('fade-out');
+                tooltip.classList.remove('show');
+            }, 2000);
         } else {
             // Disable Modern Mode when exiting Impact Analysis
             if (this.modernMode) {
@@ -3795,12 +3799,26 @@ class DiagramEditor {
 
             btn.classList.remove('active');
             panel.style.display = 'none';
+
+            // Reset tooltip state properly
+            const tooltip = document.getElementById('impactAnalysisTooltip');
+            tooltip.classList.remove('show', 'fade-out');
+
             this.impactTargets = [];
             this.impactUpstream = [];
             this.impactDownstream = [];
 
             // Restore normal cursor
             this.canvas.classList.remove('impact-analysis-mode');
+
+            // Restore saved selection state
+            if (this.savedSelectedShape !== undefined || this.savedSelectedShapes !== undefined) {
+                this.selectedShape = this.savedSelectedShape || null;
+                this.selectedShapes = this.savedSelectedShapes || [];
+            }
+            // Clear saved values
+            this.savedSelectedShape = undefined;
+            this.savedSelectedShapes = undefined;
         }
 
         this.redraw();
@@ -3822,13 +3840,25 @@ class DiagramEditor {
 
         btn.classList.remove('active');
         panel.style.display = 'none';
-        tooltip.style.display = 'none';
+
+        // Reset tooltip state properly (don't use inline display style)
+        tooltip.classList.remove('show', 'fade-out');
+
         this.impactTargets = [];
         this.impactUpstream = [];
         this.impactDownstream = [];
 
         // Restore normal cursor
         this.canvas.classList.remove('impact-analysis-mode');
+
+        // Restore saved selection state
+        if (this.savedSelectedShape !== undefined || this.savedSelectedShapes !== undefined) {
+            this.selectedShape = this.savedSelectedShape || null;
+            this.selectedShapes = this.savedSelectedShapes || [];
+        }
+        // Clear saved values
+        this.savedSelectedShape = undefined;
+        this.savedSelectedShapes = undefined;
 
         this.redraw();
     }

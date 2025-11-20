@@ -785,9 +785,9 @@ body {
     width: 350px;
     max-height: 70vh;
     background: white;
-    border: 2px solid #ff9800;
+    border: 2px solid #8b5cf6;
     border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 12px 32px rgba(139, 92, 246, 0.25);
     z-index: 1500;
     overflow: hidden;
 }
@@ -797,9 +797,9 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 16px;
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
     color: white;
-    border-bottom: 1px solid #f57c00;
+    border-bottom: 1px solid #7c3aed;
 }
 
 .impact-header h3 {
@@ -851,17 +851,18 @@ body {
 }
 
 .impact-target {
-    background: #e3f2fd;
-    border-left: 4px solid #2196f3;
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    border-left: 4px solid #a855f7;
     padding: 12px;
     border-radius: 6px;
     margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(168, 85, 247, 0.1);
 }
 
 .impact-target .shape-name {
     font-weight: 600;
     font-size: 15px;
-    color: #1976d2;
+    color: #7c3aed;
 }
 
 .impact-target .shape-type {
@@ -892,15 +893,15 @@ body {
 }
 
 .impact-item.upstream {
-    background: #fff3e0;
-    border-left: 3px solid #ff9800;
-    color: #e65100;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-left: 3px solid #3b82f6;
+    color: #1e40af;
 }
 
 .impact-item.downstream {
-    background: #ffebee;
-    border-left: 3px solid #f44336;
-    color: #c62828;
+    background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+    border-left: 3px solid #ec4899;
+    color: #be185d;
 }
 
 .impact-item .arrow {
@@ -921,13 +922,13 @@ body {
 }
 
 .stat-box.upstream {
-    background: #fff3e0;
-    border: 1px solid #ff9800;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 2px solid #3b82f6;
 }
 
 .stat-box.downstream {
-    background: #ffebee;
-    border: 1px solid #f44336;
+    background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+    border: 2px solid #ec4899;
 }
 
 .stat-number {
@@ -949,4 +950,32 @@ body.modern-mode .canvas-wrapper {
 
 body.modern-mode canvas {
     background: white;
+}
+
+/* Impact Analysis Tooltip */
+#impactAnalysisTooltip {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    padding: 20px 32px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    z-index: 10000;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+#impactAnalysisTooltip.show {
+    opacity: 1;
+}
+
+#impactAnalysisTooltip.fade-out {
+    opacity: 0;
 }
