@@ -1000,6 +1000,7 @@ body.modern-mode canvas {
     overflow-y: hidden;
     align-items: center;
     scrollbar-width: thin;
+    padding-right: 8px;
 }
 
 .bottom-tabs-container::-webkit-scrollbar {
@@ -1080,6 +1081,7 @@ body.modern-mode canvas {
     justify-content: center;
     transition: all 0.2s;
     flex-shrink: 0;
+    order: 9999;
 }
 
 .bottom-new-tab-btn:hover {

@@ -58,6 +58,8 @@
                     </svg>
                 </button>
 
+                <div class="tool-separator"></div>
+
                 <button class="tool-btn" data-shape="rectangle" title="Rectangle (R)">
                     <svg width="20" height="20" viewBox="0 0 20 20">
                         <rect x="2" y="5" width="16" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -79,6 +81,8 @@
                     </svg>
                 </button>
 
+                <div class="tool-separator"></div>
+
                 <button class="tool-btn" data-shape="database" title="Database">
                     <svg width="20" height="20" viewBox="0 0 20 20">
                         <ellipse cx="10" cy="6" rx="6" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -98,8 +102,10 @@
                     </svg>
                 </button>
 
+                <div class="tool-separator"></div>
+
                 <!-- Connection/Line Styles -->
-                <button class="tool-btn active" id="solidLineBtn" title="Solid Line" data-line-style="solid">
+                <button class="tool-btn" id="solidLineBtn" title="Solid Line" data-line-style="solid">
                     <svg width="20" height="20" viewBox="0 0 20 20">
                         <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="2"/>
                     </svg>
@@ -254,7 +260,7 @@
                 <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                     <div style="flex: 1;">
                         <label style="font-size: 12px; color: #666;">Start:</label>
-                        <select id="startArrowType" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
+                        <select id="selectorStartArrowType" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
                             <option value="none">None</option>
                             <option value="arrow">Arrow</option>
                             <option value="circle">Circle</option>
@@ -263,7 +269,7 @@
                     </div>
                     <div style="flex: 1;">
                         <label style="font-size: 12px; color: #666;">End:</label>
-                        <select id="endArrowType" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
+                        <select id="selectorEndArrowType" style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
                             <option value="none">None</option>
                             <option value="arrow" selected>Arrow</option>
                             <option value="circle">Circle</option>
@@ -386,8 +392,8 @@ Click 'View as Mermaid' button to see the generated code." style="flex: 1; font-
         <div class="bottom-tab-bar">
             <div class="bottom-tabs-container" id="bottomTabsContainer">
                 <!-- Tabs will be created dynamically -->
+                <button class="bottom-new-tab-btn" id="bottomNewTabBtn" title="New tab">+</button>
             </div>
-            <button class="bottom-new-tab-btn" id="bottomNewTabBtn" title="New tab">+</button>
         </div>
     </div>
     <script src="script.js"></script>
