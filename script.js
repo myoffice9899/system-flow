@@ -5261,14 +5261,41 @@ class DiagramEditor {
     // Share Link Functions
     copyShareLink() {
         try {
-            // Encode current diagram data
+            // Minify shape data - only keep essential properties
+            const minifyShape = (shape) => {
+                const mini = {
+                    t: shape.type,
+                    x: Math.round(shape.x),
+                    y: Math.round(shape.y),
+                    w: Math.round(shape.width),
+                    h: Math.round(shape.height)
+                };
+                if (shape.text) mini.txt = shape.text;
+                if (shape.fillColor !== '#e3f2fd') mini.f = shape.fillColor;
+                if (shape.strokeColor !== '#1976d2') mini.s = shape.strokeColor;
+                if (shape.strokeWidth !== 2) mini.sw = shape.strokeWidth;
+                if (shape.children && shape.children.length > 0) {
+                    mini.ch = shape.children.map(c => minifyShape(c));
+                }
+                return mini;
+            };
+
+            const minifyConnection = (conn, shapes) => {
+                const mini = {
+                    f: shapes.indexOf(conn.from),
+                    t: shapes.indexOf(conn.to)
+                };
+                if (conn.label) mini.l = conn.label;
+                if (conn.startArrow !== 'none') mini.sa = conn.startArrow;
+                if (conn.endArrow !== 'arrow') mini.ea = conn.endArrow;
+                if (conn.lineStyle !== 'solid') mini.ls = conn.lineStyle;
+                return mini;
+            };
+
+            // Encode current diagram data with minified format
             const diagramData = {
-                shapes: this.shapes,
-                connections: this.connections,
-                layers: this.layers,
-                zoom: this.zoom,
-                panX: this.panX,
-                panY: this.panY
+                s: this.shapes.map(sh => minifyShape(sh)),
+                c: this.connections.map(cn => minifyConnection(cn, this.shapes))
             };
 
             // Convert to JSON and compress using base64
@@ -5277,7 +5304,7 @@ class DiagramEditor {
 
             // Create URL with data
             const baseUrl = window.location.origin + window.location.pathname;
-            const shareUrl = `${baseUrl}?data=${encoded}`;
+            const shareUrl = `${baseUrl}?d=${encoded}`;
 
             // Copy to clipboard
             navigator.clipboard.writeText(shareUrl).then(() => {
@@ -5308,7 +5335,7 @@ class DiagramEditor {
         try {
             // Check if there's data in URL
             const urlParams = new URLSearchParams(window.location.search);
-            const encodedData = urlParams.get('data');
+            const encodedData = urlParams.get('d') || urlParams.get('data'); // Support both new (d) and old (data) format
 
             if (!encodedData) return;
 
@@ -5316,28 +5343,69 @@ class DiagramEditor {
             const jsonStr = decodeURIComponent(atob(encodedData));
             const diagramData = JSON.parse(jsonStr);
 
-            // Load diagram data
-            if (diagramData.shapes) {
-                this.shapes = diagramData.shapes;
-            }
-            if (diagramData.connections) {
-                this.connections = diagramData.connections;
-            }
-            if (diagramData.layers) {
-                this.layers = diagramData.layers;
-                if (this.layers.length > 0) {
-                    this.activeLayer = this.layers[0];
+            // Expand minified data if using new format
+            const expandShape = (mini) => {
+                const shape = {
+                    id: Date.now() + Math.random(),
+                    type: mini.t,
+                    x: mini.x,
+                    y: mini.y,
+                    width: mini.w,
+                    height: mini.h,
+                    text: mini.txt || '',
+                    fillColor: mini.f || '#e3f2fd',
+                    strokeColor: mini.s || '#1976d2',
+                    strokeWidth: mini.sw || 2
+                };
+                if (mini.ch) {
+                    shape.children = mini.ch.map(c => expandShape(c));
+                    shape.childConnections = [];
                 }
-            }
-            if (diagramData.zoom) {
-                this.zoom = diagramData.zoom;
-                document.getElementById('zoomLevel').textContent = Math.round(this.zoom * 100) + '%';
-            }
-            if (diagramData.panX !== undefined) {
-                this.panX = diagramData.panX;
-            }
-            if (diagramData.panY !== undefined) {
-                this.panY = diagramData.panY;
+                return shape;
+            };
+
+            // Check if new minified format (has 's' and 'c' properties)
+            if (diagramData.s) {
+                // New minified format
+                this.shapes = diagramData.s.map(s => expandShape(s));
+
+                // Expand connections
+                if (diagramData.c) {
+                    this.connections = diagramData.c.map(c => ({
+                        from: this.shapes[c.f],
+                        to: this.shapes[c.t],
+                        label: c.l || '',
+                        name: '',
+                        note: '',
+                        startArrow: c.sa || 'none',
+                        endArrow: c.ea || 'arrow',
+                        lineStyle: c.ls || 'solid'
+                    }));
+                }
+            } else {
+                // Old format - load directly
+                if (diagramData.shapes) {
+                    this.shapes = diagramData.shapes;
+                }
+                if (diagramData.connections) {
+                    this.connections = diagramData.connections;
+                }
+                if (diagramData.layers) {
+                    this.layers = diagramData.layers;
+                    if (this.layers.length > 0) {
+                        this.activeLayer = this.layers[0];
+                    }
+                }
+                if (diagramData.zoom) {
+                    this.zoom = diagramData.zoom;
+                    document.getElementById('zoomLevel').textContent = Math.round(this.zoom * 100) + '%';
+                }
+                if (diagramData.panX !== undefined) {
+                    this.panX = diagramData.panX;
+                }
+                if (diagramData.panY !== undefined) {
+                    this.panY = diagramData.panY;
+                }
             }
 
             // Update UI
