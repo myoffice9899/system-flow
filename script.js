@@ -659,6 +659,15 @@ class DiagramEditor {
         }
 
         if (this.currentTool === 'draw') {
+            // Check if clicking on connection midpoint FIRST (highest priority)
+            const connection = this.getConnectionMidpointAt(pos);
+            if (connection) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.openConnectionEditor(connection, { x: e.clientX, y: e.clientY });
+                return;
+            }
+
             // Check if clicking on existing shape - auto-switch to connect mode
             const shape = this.getShapeAt(pos);
             if (shape) {
