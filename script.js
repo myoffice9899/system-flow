@@ -505,34 +505,7 @@ class DiagramEditor {
             e.target.value = ''; // Reset input
         });
 
-        // Hamburger menu
-        const hamburgerBtn = document.getElementById('hamburgerBtn');
-        const dropdownMenu = document.getElementById('dropdownMenu');
-
-        hamburgerBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isVisible = dropdownMenu.style.display === 'block';
-
-            if (!isVisible) {
-                // Calculate position based on button
-                const rect = hamburgerBtn.getBoundingClientRect();
-                dropdownMenu.style.top = (rect.bottom + 4) + 'px';
-                dropdownMenu.style.left = rect.left + 'px';
-                dropdownMenu.style.display = 'block';
-                hamburgerBtn.classList.add('active');
-            } else {
-                dropdownMenu.style.display = 'none';
-                hamburgerBtn.classList.remove('active');
-            }
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!hamburgerBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
-                dropdownMenu.style.display = 'none';
-                hamburgerBtn.classList.remove('active');
-            }
-        });
+        // Hamburger menu is now handled globally in setupSharedUIEvents()
 
         // Layer dropdown toggle (only toggle with button, stays open otherwise)
         const layerToggleBtn = document.getElementById('layerToggleBtn');
@@ -5398,5 +5371,239 @@ class DiagramEditor {
     }
 }
 
-// Initialize the editor
-const editor = new DiagramEditor();
+// Tab Manager Class
+class TabManager {
+    constructor() {
+        this.tabs = new Map();
+        this.activeTabId = null;
+        this.nextTabId = 1;
+
+        this.tabsContainer = document.getElementById('bottomTabsContainer');
+        this.newTabBtn = document.getElementById('bottomNewTabBtn');
+        this.canvas = document.getElementById('canvas');
+        this.canvasWrapper = document.getElementById('canvasWrapper');
+
+        // Create first tab
+        this.createNewTab();
+
+        // Event listeners
+        this.newTabBtn.addEventListener('click', () => this.createNewTab());
+
+        // Tab click handlers (event delegation)
+        this.tabsContainer.addEventListener('click', (e) => {
+            const tab = e.target.closest('.bottom-tab');
+            const closeBtn = e.target.closest('.bottom-tab-close-btn');
+
+            if (closeBtn && tab) {
+                e.stopPropagation();
+                const tabId = parseInt(tab.dataset.tabId);
+                this.closeTab(tabId);
+            } else if (tab) {
+                const tabId = parseInt(tab.dataset.tabId);
+                this.switchTab(tabId);
+            }
+        });
+
+        // Double click to rename
+        this.tabsContainer.addEventListener('dblclick', (e) => {
+            const tabName = e.target.closest('.bottom-tab-name');
+            if (tabName) {
+                const tab = tabName.closest('.bottom-tab');
+                const tabId = parseInt(tab.dataset.tabId);
+                this.renameTab(tabId, tabName);
+            }
+        });
+    }
+
+    createNewTab() {
+        const tabId = this.nextTabId++;
+
+        // Create new canvas element for this tab
+        const newCanvas = document.createElement('canvas');
+        newCanvas.id = 'canvas';
+
+        // Create new editor instance with the new canvas
+        const editor = new DiagramEditor(newCanvas);
+
+        // Store tab data
+        this.tabs.set(tabId, {
+            editor: editor,
+            canvas: newCanvas,
+            name: `Diagram ${tabId}`
+        });
+
+        // Create tab element
+        const tabElement = document.createElement('div');
+        tabElement.className = 'bottom-tab';
+        tabElement.dataset.tabId = tabId;
+        tabElement.innerHTML = `
+            <span class="bottom-tab-name">${this.tabs.get(tabId).name}</span>
+            <button class="bottom-tab-close-btn" title="Close tab">×</button>
+        `;
+
+        this.tabsContainer.appendChild(tabElement);
+
+        // Switch to new tab
+        this.switchTab(tabId);
+
+        return tabId;
+    }
+
+    switchTab(tabId) {
+        if (!this.tabs.has(tabId) || this.activeTabId === tabId) return;
+
+        // Save current tab state if exists
+        if (this.activeTabId && this.tabs.has(this.activeTabId)) {
+            const currentTab = this.tabs.get(this.activeTabId);
+            // State is already maintained in the editor instance
+        }
+
+        // Update active tab
+        this.activeTabId = tabId;
+
+        // Update tab UI
+        document.querySelectorAll('.bottom-tab').forEach(tab => {
+            tab.classList.toggle('active', parseInt(tab.dataset.tabId) === tabId);
+        });
+
+        // Get new tab data
+        const newTab = this.tabs.get(tabId);
+
+        // Replace canvas
+        const oldCanvas = this.canvas;
+        const newCanvas = newTab.canvas;
+
+        // Replace in DOM
+        this.canvasWrapper.replaceChild(newCanvas, oldCanvas);
+        this.canvas = newCanvas;
+
+        // Redraw
+        newTab.editor.redraw();
+    }
+
+    closeTab(tabId) {
+        if (this.tabs.size <= 1) {
+            alert('Cannot close the last tab');
+            return;
+        }
+
+        // Confirm if tab has content
+        const tab = this.tabs.get(tabId);
+        if (tab.editor.shapes.length > 0 || tab.editor.connections.length > 0) {
+            if (!confirm('Close this tab? All unsaved changes will be lost.')) {
+                return;
+            }
+        }
+
+        // Remove tab
+        this.tabs.delete(tabId);
+
+        // Remove tab element
+        const tabElement = this.tabsContainer.querySelector(`[data-tab-id="${tabId}"]`);
+        if (tabElement) {
+            tabElement.remove();
+        }
+
+        // Switch to another tab if this was active
+        if (this.activeTabId === tabId) {
+            const remainingTabs = Array.from(this.tabs.keys());
+            this.switchTab(remainingTabs[0]);
+        }
+    }
+
+    renameTab(tabId, tabNameElement) {
+        const currentName = this.tabs.get(tabId).name;
+
+        // Create input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.style.cssText = `
+            width: 100%;
+            border: 1px solid #4caf50;
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-size: 13px;
+            outline: none;
+        `;
+
+        // Replace span with input
+        tabNameElement.replaceWith(input);
+        input.focus();
+        input.select();
+
+        const finishRename = () => {
+            const newName = input.value.trim() || currentName;
+            this.tabs.get(tabId).name = newName;
+
+            // Replace input with span
+            const newSpan = document.createElement('span');
+            newSpan.className = 'bottom-tab-name';
+            newSpan.textContent = newName;
+            input.replaceWith(newSpan);
+        };
+
+        input.addEventListener('blur', finishRename);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                input.blur();
+            } else if (e.key === 'Escape') {
+                input.value = currentName;
+                input.blur();
+            }
+        });
+    }
+
+    getActiveEditor() {
+        return this.tabs.get(this.activeTabId)?.editor;
+    }
+}
+
+// Setup shared UI events (only once)
+function setupSharedUIEvents() {
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const dropdownMenu = document.getElementById('dropdownMenu');
+
+    // Remove any existing listeners by cloning the button
+    const newHamburgerBtn = hamburgerBtn.cloneNode(true);
+    hamburgerBtn.parentNode.replaceChild(newHamburgerBtn, hamburgerBtn);
+
+    newHamburgerBtn.addEventListener('click', (e) => {
+        console.log('🍔 Hamburger clicked!');
+        e.stopPropagation();
+
+        // Check what element is on top at click position
+        const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+        console.log('Element at click point:', elementAtPoint);
+        console.log('Dropdown z-index:', window.getComputedStyle(dropdownMenu).zIndex);
+        console.log('Hamburger z-index:', window.getComputedStyle(newHamburgerBtn).zIndex);
+
+        const isVisible = dropdownMenu.style.display === 'block';
+
+        if (!isVisible) {
+            // Calculate position based on button
+            const rect = newHamburgerBtn.getBoundingClientRect();
+            dropdownMenu.style.top = (rect.bottom + 4) + 'px';
+            dropdownMenu.style.left = rect.left + 'px';
+            dropdownMenu.style.display = 'block';
+            newHamburgerBtn.classList.add('active');
+            console.log('✅ Menu opened');
+        } else {
+            dropdownMenu.style.display = 'none';
+            newHamburgerBtn.classList.remove('active');
+            console.log('❌ Menu closed');
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!newHamburgerBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+            dropdownMenu.style.display = 'none';
+            newHamburgerBtn.classList.remove('active');
+        }
+    });
+}
+
+// Initialize
+setupSharedUIEvents();
+const tabManager = new TabManager();
