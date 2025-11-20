@@ -653,9 +653,9 @@ body {
 .right-sidebar {
     position: fixed;
     right: 0;
-    top: 0;
+    top: 50px; /* Below top toolbar */
     width: 350px;
-    height: 100vh;
+    height: calc(100vh - 50px); /* Adjust height to account for toolbar */
     background: #ffffff;
     border-left: 1px solid #e3e3e3;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
@@ -1090,4 +1090,29 @@ body.modern-mode canvas {
 
 .bottom-new-tab-btn:active {
     transform: scale(0.95);
+}
+
+/* Textarea placeholder styling */
+textarea::placeholder {
+    color: #999;
+    opacity: 1;
+    font-style: italic;
+}
+
+textarea::-webkit-input-placeholder {
+    color: #999;
+    opacity: 1;
+    font-style: italic;
+}
+
+textarea::-moz-placeholder {
+    color: #999;
+    opacity: 1;
+    font-style: italic;
+}
+
+textarea:-ms-input-placeholder {
+    color: #999;
+    opacity: 1;
+    font-style: italic;
 }

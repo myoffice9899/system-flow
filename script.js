@@ -375,6 +375,60 @@ class DiagramEditor {
             this.importFromSidebarTextarea();
         });
 
+        // Auto-import when layout direction changes
+        document.querySelectorAll('input[name="layoutDirection"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const mermaidText = document.getElementById('mermaidInput').value.trim();
+                if (mermaidText) {
+                    this.importFromSidebarTextarea();
+                }
+            });
+        });
+
+        // Auto-import after pasting (with delay to ensure paste completes)
+        document.getElementById('mermaidInput').addEventListener('paste', (e) => {
+            setTimeout(() => {
+                const mermaidText = document.getElementById('mermaidInput').value.trim();
+                if (mermaidText) {
+                    this.importFromSidebarTextarea();
+                }
+            }, 100);
+        });
+
+        // Realtime preview when typing (with debounce)
+        let mermaidInputTimeout;
+        document.getElementById('mermaidInput').addEventListener('input', (e) => {
+            clearTimeout(mermaidInputTimeout);
+            mermaidInputTimeout = setTimeout(() => {
+                const mermaidText = e.target.value.trim();
+                if (mermaidText) {
+                    this.importFromSidebarTextarea();
+                }
+            }, 500); // Wait 500ms after user stops typing
+        });
+
+        // Realtime preview for View Mode (mermaidOutput) when editing
+        let mermaidOutputTimeout;
+        document.getElementById('mermaidOutput').addEventListener('input', (e) => {
+            clearTimeout(mermaidOutputTimeout);
+            mermaidOutputTimeout = setTimeout(() => {
+                const mermaidText = e.target.value.trim();
+                if (mermaidText) {
+                    this.applyMermaidChanges();
+                }
+            }, 500); // Wait 500ms after user stops typing
+        });
+
+        // Auto-apply when layout direction changes in View Mode
+        document.querySelectorAll('input[name="applyLayoutDirection"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const mermaidText = document.getElementById('mermaidOutput').value.trim();
+                if (mermaidText) {
+                    this.applyMermaidChanges();
+                }
+            });
+        });
+
         // Modern Mode toggle
         document.getElementById('modernModeBtn').addEventListener('click', () => {
             this.toggleModernMode();
@@ -3660,10 +3714,15 @@ class DiagramEditor {
         document.getElementById('importMode').style.display = 'flex';
         document.getElementById('viewMode').style.display = 'none';
         document.getElementById('rightSidebar').style.display = 'flex';
+
+        // Clear textarea when opening Import mode (ensure it's empty)
+        document.getElementById('mermaidInput').value = '';
     }
 
     closeMermaidSidebar() {
         document.getElementById('rightSidebar').style.display = 'none';
+        // Clear textarea when closing sidebar
+        document.getElementById('mermaidInput').value = '';
     }
 
     showMermaidView() {
@@ -3673,9 +3732,14 @@ class DiagramEditor {
         document.getElementById('viewMode').style.display = 'flex';
         document.getElementById('rightSidebar').style.display = 'flex';
 
-        // Generate and display Mermaid code
-        const mermaidCode = this.generateMermaidFromDiagram();
-        document.getElementById('mermaidOutput').value = mermaidCode;
+        // Generate and display Mermaid code only if there are shapes
+        if (this.shapes.length > 0) {
+            const mermaidCode = this.generateMermaidFromDiagram();
+            document.getElementById('mermaidOutput').value = mermaidCode;
+        } else {
+            // Clear textarea if no shapes
+            document.getElementById('mermaidOutput').value = '';
+        }
     }
 
     applyMermaidChanges() {
@@ -4452,9 +4516,14 @@ class DiagramEditor {
                 return;
             }
 
-            // Update the Mermaid code
-            const mermaidCode = this.generateMermaidFromDiagram();
-            mermaidOutput.value = mermaidCode;
+            // Update the Mermaid code only if there are shapes
+            if (this.shapes.length > 0) {
+                const mermaidCode = this.generateMermaidFromDiagram();
+                mermaidOutput.value = mermaidCode;
+            } else {
+                // Clear textarea if no shapes
+                mermaidOutput.value = '';
+            }
         }
     }
 
@@ -4582,15 +4651,20 @@ class DiagramEditor {
     importFromSidebarTextarea() {
         const mermaidText = document.getElementById('mermaidInput').value.trim();
         if (mermaidText) {
+            // Clear current diagram first
+            this.shapes = [];
+            this.connections = [];
+            this.rootShapes = [];
+            this.rootConnections = [];
+
             // Get layout direction
             const directionElement = document.querySelector('input[name="layoutDirection"]:checked');
             const direction = directionElement ? directionElement.value : 'horizontal';
             console.log('Selected direction:', direction);
             this.importFromMermaid(mermaidText, direction);
-            // Clear textarea after import
-            document.getElementById('mermaidInput').value = '';
-            // Close sidebar
-            this.closeMermaidSidebar();
+
+            // Don't clear textarea - keep it for re-importing with different layout
+            // Don't close sidebar automatically - let user close it
         } else {
             alert('Please paste your Mermaid code first.');
         }

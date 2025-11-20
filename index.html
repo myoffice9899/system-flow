@@ -319,13 +319,7 @@
             <div class="sidebar-content">
                 <!-- Import Mode -->
                 <div id="importMode" style="display: flex; flex-direction: column; gap: 12px; height: 100%;">
-                    <textarea id="mermaidInput" placeholder="Paste your Mermaid flowchart code here...
-
-Example:
-flowchart TD
-    A[Start] --> B{Decision}
-    B -->|Yes| C[Process]
-    B -->|No| D[End]"></textarea>
+                    <textarea id="mermaidInput" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Paste Mermaid code here (e.g., flowchart LR, A-->B)"></textarea>
 
                     <div class="layout-options">
                         <label style="font-weight: 600; margin-bottom: 8px; display: block;">Layout Direction:</label>
@@ -346,7 +340,9 @@ flowchart TD
 
                 <!-- View Mode -->
                 <div id="viewMode" style="display: none; flex-direction: column; gap: 12px; height: 100%;">
-                    <textarea id="mermaidOutput" style="flex: 1; font-family: 'Courier New', monospace; font-size: 13px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; resize: none;"></textarea>
+                    <textarea id="mermaidOutput" placeholder="Your diagram will be displayed as Mermaid code here...
+
+Click 'View as Mermaid' button to see the generated code." style="flex: 1; font-family: 'Courier New', monospace; font-size: 13px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; resize: none;"></textarea>
 
                     <div class="layout-options">
                         <label style="font-weight: 600; margin-bottom: 8px; display: block;">Layout Direction:</label>
