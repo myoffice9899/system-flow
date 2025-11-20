@@ -1319,9 +1319,9 @@ class DiagramEditor {
             return cloned;
         };
 
-        // Get shapes to copy
-        const shapesToCopy = this.currentGroup === null ? this.shapes : this.rootShapes;
-        const connectionsToCopy = this.currentGroup === null ? this.connections : this.rootConnections;
+        // Get shapes to copy (always use current view, not root)
+        const shapesToCopy = this.shapes;
+        const connectionsToCopy = this.connections;
 
         // Helper function to restore connections with cloned shapes
         const restoreConnections = (originalShapes, clonedShapes, originalConnections) => {
@@ -1397,14 +1397,14 @@ class DiagramEditor {
             restoreChildConnections(shapesToCopy[index], clonedShape);
         });
 
-        // Save To-Be data
+        // Save To-Be data (preserve current group and path)
         this.toBeData = {
             shapes: clonedShapes,
             connections: clonedConnections,
-            rootShapes: this.currentGroup === null ? clonedShapes : clonedShapes,
-            rootConnections: this.currentGroup === null ? clonedConnections : clonedConnections,
-            currentGroup: null,
-            groupPath: []
+            rootShapes: clonedShapes,
+            rootConnections: clonedConnections,
+            currentGroup: this.currentGroup,
+            groupPath: [...this.groupPath]
         };
 
         // Enable comparison mode
@@ -1442,14 +1442,14 @@ class DiagramEditor {
                 this.asIsData.rootShapes = this.rootShapes;
                 this.asIsData.rootConnections = this.rootConnections;
                 this.asIsData.currentGroup = this.currentGroup;
-                this.asIsData.groupPath = this.groupPath;
+                this.asIsData.groupPath = [...this.groupPath];  // Copy array
             } else if (this.currentView === 'tobe' && this.toBeData) {
                 this.toBeData.shapes = this.shapes;
                 this.toBeData.connections = this.connections;
                 this.toBeData.rootShapes = this.rootShapes;
                 this.toBeData.rootConnections = this.rootConnections;
                 this.toBeData.currentGroup = this.currentGroup;
-                this.toBeData.groupPath = this.groupPath;
+                this.toBeData.groupPath = [...this.groupPath];  // Copy array
             }
         }
 
@@ -1463,7 +1463,7 @@ class DiagramEditor {
             this.rootShapes = data.rootShapes;
             this.rootConnections = data.rootConnections;
             this.currentGroup = data.currentGroup;
-            this.groupPath = data.groupPath || [];
+            this.groupPath = [...(data.groupPath || [])];  // Copy array
         }
 
         this.selectedShape = null;
