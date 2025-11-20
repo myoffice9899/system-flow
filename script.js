@@ -591,20 +591,12 @@ class DiagramEditor {
             this.dragStartX = pos.x;
             this.dragStartY = pos.y;
         } else if (this.currentTool === 'select') {
-            // Check if clicking on a connection midpoint first
-            const connection = this.getConnectionMidpointAt(pos);
-            if (connection) {
-                e.preventDefault();
-                e.stopPropagation();
-                this.openConnectionEditor(connection, { x: e.clientX, y: e.clientY });
-                return;
-            }
-
             const handle = this.getResizeHandle(pos);
             if (handle) {
                 this.isResizing = true;
                 this.resizeHandle = handle;
             } else {
+                // Check if clicking on a shape FIRST (shapes have priority)
                 const shape = this.getShapeAt(pos);
                 if (shape) {
                     // Ignore context boxes for selection
@@ -628,18 +620,27 @@ class DiagramEditor {
                     this.dragStartY = pos.y - shape.y;
                     this.updatePropertiesPanel();
                 } else {
-                    // Check if clicking on a connection
-                    const connection = this.getConnectionAt(pos);
+                    // No shape clicked - check if clicking on a connection midpoint
+                    const connection = this.getConnectionMidpointAt(pos);
                     if (connection) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.openConnectionEditor(connection, { x: e.clientX, y: e.clientY });
+                        return;
+                    }
+
+                    // Check if clicking on a connection line
+                    const connectionLine = this.getConnectionAt(pos);
+                    if (connectionLine) {
                         // Select the connection
-                        if (!this.selectedConnections.includes(connection)) {
+                        if (!this.selectedConnections.includes(connectionLine)) {
                             // Clear previous selection unless holding Ctrl/Cmd
                             if (!e.ctrlKey && !e.metaKey) {
                                 this.selectedConnections = [];
                                 this.selectedShapes = [];
                                 this.selectedShape = null;
                             }
-                            this.selectedConnections.push(connection);
+                            this.selectedConnections.push(connectionLine);
                         }
                         this.redraw();
                     } else {
