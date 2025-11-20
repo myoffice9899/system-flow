@@ -100,6 +100,8 @@ class DiagramEditor {
 
         // Mermaid layout direction
         this.mermaidLayoutDirection = 'LR'; // Default to Left-Right
+        this.mermaidInputCode = ''; // Store import textarea content per tab
+        this.mermaidOutputCode = ''; // Store output/apply textarea content per tab
 
         // Connection editor
         this.editingConnection = null;
@@ -440,63 +442,7 @@ class DiagramEditor {
             this.closeMermaidSidebar();
         });
 
-        document.getElementById('importFromSidebar').addEventListener('click', () => {
-            this.importFromSidebarTextarea();
-        });
-
-        // Auto-import when layout direction changes
-        document.querySelectorAll('input[name="layoutDirection"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                const mermaidText = document.getElementById('mermaidInput').value.trim();
-                if (mermaidText) {
-                    this.importFromSidebarTextarea();
-                }
-            });
-        });
-
-        // Auto-import after pasting (with delay to ensure paste completes)
-        document.getElementById('mermaidInput').addEventListener('paste', (e) => {
-            setTimeout(() => {
-                const mermaidText = document.getElementById('mermaidInput').value.trim();
-                if (mermaidText) {
-                    this.importFromSidebarTextarea();
-                }
-            }, 100);
-        });
-
-        // Realtime preview when typing (with debounce)
-        let mermaidInputTimeout;
-        document.getElementById('mermaidInput').addEventListener('input', (e) => {
-            clearTimeout(mermaidInputTimeout);
-            mermaidInputTimeout = setTimeout(() => {
-                const mermaidText = e.target.value.trim();
-                if (mermaidText) {
-                    this.importFromSidebarTextarea();
-                }
-            }, 500); // Wait 500ms after user stops typing
-        });
-
-        // Realtime preview for View Mode (mermaidOutput) when editing
-        let mermaidOutputTimeout;
-        document.getElementById('mermaidOutput').addEventListener('input', (e) => {
-            clearTimeout(mermaidOutputTimeout);
-            mermaidOutputTimeout = setTimeout(() => {
-                const mermaidText = e.target.value.trim();
-                if (mermaidText) {
-                    this.applyMermaidChanges();
-                }
-            }, 500); // Wait 500ms after user stops typing
-        });
-
-        // Auto-apply when layout direction changes in View Mode
-        document.querySelectorAll('input[name="applyLayoutDirection"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                const mermaidText = document.getElementById('mermaidOutput').value.trim();
-                if (mermaidText) {
-                    this.applyMermaidChanges();
-                }
-            });
-        });
+        // Import, Apply buttons and auto-preview are now handled globally in setupMermaidButtons()
 
         // Modern Mode toggle
         document.getElementById('modernModeBtn').addEventListener('click', () => {
@@ -517,10 +463,7 @@ class DiagramEditor {
             this.showMermaidView();
         });
 
-        // Apply Mermaid changes
-        document.getElementById('applyMermaidChanges').addEventListener('click', () => {
-            this.applyMermaidChanges();
-        });
+        // Apply button is now handled globally in setupMermaidButtons()
 
         // Copy Mermaid code
         document.getElementById('copyMermaidBtn').addEventListener('click', () => {
@@ -1739,6 +1682,36 @@ class DiagramEditor {
         }
     }
 
+    updateMermaidOutputIfOpen() {
+        // Check if this editor is the active one and view mode is open
+        const activeEditor = window.tabManager?.getActiveEditor();
+        if (activeEditor !== this) return; // Only update if this is the active editor
+
+        const rightSidebar = document.getElementById('rightSidebar');
+        const viewMode = document.getElementById('viewMode');
+        const isViewModeActive = rightSidebar?.style.display === 'flex' && viewMode?.style.display === 'flex';
+
+        console.log('[updateMermaidOutputIfOpen]', {
+            isActive: activeEditor === this,
+            isViewModeActive,
+            shapesCount: this.shapes.length
+        });
+
+        if (isViewModeActive) {
+            // Re-generate and update mermaid output
+            if (this.shapes.length > 0) {
+                const mermaidCode = this.generateMermaidFromDiagram();
+                console.log('[updateMermaidOutputIfOpen] Generated:', mermaidCode);
+                document.getElementById('mermaidOutput').value = mermaidCode;
+                this.mermaidOutputCode = mermaidCode;
+            } else {
+                console.log('[updateMermaidOutputIfOpen] No shapes');
+                document.getElementById('mermaidOutput').value = 'flowchart LR\n';
+                this.mermaidOutputCode = 'flowchart LR\n';
+            }
+        }
+    }
+
     // Undo/Redo system
     saveState() {
         // Filter out context boxes before saving
@@ -1746,6 +1719,9 @@ class DiagramEditor {
         const realConnections = this.connections.filter(c => !c.isContextConnection);
         const realRootShapes = this.rootShapes.filter(s => !s.isContextBox);
         const realRootConnections = this.rootConnections.filter(c => !c.isContextConnection);
+
+        // Auto-update mermaid output if view mode is open
+        this.updateMermaidOutputIfOpen();
 
         // Deep clone current state
         const state = {
@@ -3970,9 +3946,12 @@ class DiagramEditor {
         if (this.shapes.length > 0) {
             const mermaidCode = this.generateMermaidFromDiagram();
             document.getElementById('mermaidOutput').value = mermaidCode;
+            // Save to editor instance
+            this.mermaidOutputCode = mermaidCode;
         } else {
             // Clear textarea if no shapes
             document.getElementById('mermaidOutput').value = '';
+            this.mermaidOutputCode = '';
         }
     }
 
@@ -3989,7 +3968,11 @@ class DiagramEditor {
             const directionElement = document.querySelector('input[name="applyLayoutDirection"]:checked');
             const direction = directionElement ? directionElement.value : 'horizontal';
 
-            console.log('Applying with direction:', direction);
+            // Store the direction in this editor instance
+            this.mermaidLayoutDirection = direction === 'vertical' ? 'TB' : 'LR';
+
+            // Save mermaid output code to this editor
+            this.mermaidOutputCode = mermaidCode;
 
             // Clear current diagram
             this.shapes = [];
@@ -4765,6 +4748,14 @@ class DiagramEditor {
         const shapesToExport = this.currentGroup === null ? this.shapes : this.rootShapes;
         const connectionsToExport = this.currentGroup === null ? this.connections : this.rootConnections;
 
+        console.log('[generateMermaidFromDiagram]', {
+            currentGroup: this.currentGroup,
+            shapesCount: this.shapes.length,
+            rootShapesCount: this.rootShapes.length,
+            shapesToExportCount: shapesToExport.length,
+            connectionsToExportCount: connectionsToExport.length
+        });
+
         // Use stored layout direction
         let mermaid = `flowchart ${this.mermaidLayoutDirection || 'LR'}\n`;
 
@@ -4872,13 +4863,20 @@ class DiagramEditor {
         });
 
         // Add any orphaned nodes (no connections) with definitions
+        console.log('[generateMermaidFromDiagram] Adding orphaned nodes...');
         shapesToExport.forEach((shape) => {
             const nodeId = shapeToId.get(shape);
+            console.log('  Checking node:', nodeId, {
+                needsDefinition: nodesNeedingDefinition.has(nodeId),
+                alreadyDefined: definedNodes.has(nodeId)
+            });
             if (nodesNeedingDefinition.has(nodeId) && !definedNodes.has(nodeId)) {
+                console.log('    Adding orphaned node:', nodesNeedingDefinition.get(nodeId));
                 mermaid += `    ${nodesNeedingDefinition.get(nodeId)}\n`;
             }
         });
 
+        console.log('[generateMermaidFromDiagram] Final mermaid:', mermaid);
         return mermaid;
     }
 
@@ -4891,10 +4889,17 @@ class DiagramEditor {
             this.rootShapes = [];
             this.rootConnections = [];
 
-            // Get layout direction
+            // Get layout direction from radio button
             const directionElement = document.querySelector('input[name="layoutDirection"]:checked');
             const direction = directionElement ? directionElement.value : 'horizontal';
             console.log('Selected direction:', direction);
+
+            // Store the direction in this editor instance
+            this.mermaidLayoutDirection = direction === 'vertical' ? 'TB' : 'LR';
+
+            // Save mermaid input code to this editor
+            this.mermaidInputCode = mermaidText;
+
             this.importFromMermaid(mermaidText, direction);
 
             // Don't clear textarea - keep it for re-importing with different layout
@@ -5849,7 +5854,9 @@ class TabManager {
         // Save current tab state if exists
         if (this.activeTabId && this.tabs.has(this.activeTabId)) {
             const currentTab = this.tabs.get(this.activeTabId);
-            // State is already maintained in the editor instance
+            // Save mermaid textarea content to current editor
+            currentTab.editor.mermaidInputCode = document.getElementById('mermaidInput').value;
+            currentTab.editor.mermaidOutputCode = document.getElementById('mermaidOutput').value;
         }
 
         // Update active tab
@@ -5902,6 +5909,74 @@ class TabManager {
 
         // Update comparison toolbar UI based on editor's state
         this.updateComparisonToolbarUI(newTab.editor);
+
+        // Sync layout direction radio buttons with editor's setting
+        this.syncLayoutDirectionUI(newTab.editor);
+
+        // Restore mermaid textarea content from new editor
+        document.getElementById('mermaidInput').value = newTab.editor.mermaidInputCode || '';
+
+        // Check if sidebar is open and in view mode
+        const rightSidebar = document.getElementById('rightSidebar');
+        const viewMode = document.getElementById('viewMode');
+        const isViewModeActive = rightSidebar.style.display === 'flex' && viewMode.style.display === 'flex';
+
+        console.log('[switchTab] View mode check:', {
+            tabId,
+            sidebarDisplay: rightSidebar.style.display,
+            viewModeDisplay: viewMode.style.display,
+            isViewModeActive,
+            shapesCount: newTab.editor.shapes.length
+        });
+
+        if (isViewModeActive) {
+            // Always re-generate mermaid code for the new tab when view mode is active
+            // This ensures we get fresh data from the current tab's shapes
+            console.log('[switchTab] Re-generating mermaid for tab', tabId);
+
+            // Important: Use a small delay to ensure canvas has been switched
+            setTimeout(() => {
+                if (newTab.editor.shapes.length > 0) {
+                    const mermaidCode = newTab.editor.generateMermaidFromDiagram();
+                    console.log('[switchTab] Generated code:', mermaidCode);
+                    document.getElementById('mermaidOutput').value = mermaidCode;
+                    newTab.editor.mermaidOutputCode = mermaidCode;
+                } else {
+                    console.log('[switchTab] No shapes in tab', tabId);
+                    document.getElementById('mermaidOutput').value = 'flowchart LR\n';
+                    newTab.editor.mermaidOutputCode = 'flowchart LR\n';
+                }
+            }, 0);
+        } else {
+            // Just restore saved content if not in view mode
+            console.log('[switchTab] Not in view mode, restoring saved content');
+            document.getElementById('mermaidOutput').value = newTab.editor.mermaidOutputCode || '';
+        }
+    }
+
+    syncLayoutDirectionUI(editor) {
+        // Get editor's layout direction (LR = horizontal, TB = vertical)
+        const direction = editor.mermaidLayoutDirection === 'TB' ? 'vertical' : 'horizontal';
+
+        // Temporarily disable syncing to prevent triggering change events
+        window._syncingLayoutDirection = true;
+
+        // Update import mode radio buttons
+        const importRadios = document.querySelectorAll('input[name="layoutDirection"]');
+        importRadios.forEach(radio => {
+            radio.checked = radio.value === direction;
+        });
+
+        // Update apply mode radio buttons
+        const applyRadios = document.querySelectorAll('input[name="applyLayoutDirection"]');
+        applyRadios.forEach(radio => {
+            radio.checked = radio.value === direction;
+        });
+
+        // Re-enable syncing
+        setTimeout(() => {
+            window._syncingLayoutDirection = false;
+        }, 0);
     }
 
     updateComparisonToolbarUI(editor) {
@@ -6214,8 +6289,106 @@ function setupComparisonToolbar() {
     }
 }
 
+// Global Mermaid layout direction listeners (work with active editor only)
+function setupMermaidLayoutListeners() {
+    // Import mode (layoutDirection)
+    document.querySelectorAll('input[name="layoutDirection"]').forEach(radio => {
+        const newRadio = radio.cloneNode(true);
+        radio.parentNode.replaceChild(newRadio, radio);
+
+        newRadio.addEventListener('change', () => {
+            // Ignore change events during programmatic sync
+            if (window._syncingLayoutDirection) return;
+
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                const mermaidText = document.getElementById('mermaidInput').value.trim();
+                if (mermaidText) {
+                    activeEditor.importFromSidebarTextarea();
+                }
+            }
+        });
+    });
+
+    // Apply mode (applyLayoutDirection)
+    document.querySelectorAll('input[name="applyLayoutDirection"]').forEach(radio => {
+        const newRadio = radio.cloneNode(true);
+        radio.parentNode.replaceChild(newRadio, radio);
+
+        newRadio.addEventListener('change', () => {
+            // Ignore change events during programmatic sync
+            if (window._syncingLayoutDirection) return;
+
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                // Just save the layout direction, don't auto-apply
+                // User must click "Apply Changes" button manually
+                const direction = newRadio.value;
+                activeEditor.mermaidLayoutDirection = direction === 'vertical' ? 'TB' : 'LR';
+            }
+        });
+    });
+}
+
+function setupMermaidButtons() {
+    // Import button
+    const importBtn = document.getElementById('importFromSidebar');
+    const newImportBtn = importBtn.cloneNode(true);
+    importBtn.parentNode.replaceChild(newImportBtn, importBtn);
+
+    newImportBtn.addEventListener('click', () => {
+        const activeEditor = window.tabManager?.getActiveEditor();
+        if (activeEditor) {
+            activeEditor.importFromSidebarTextarea();
+        }
+    });
+
+    // Apply button
+    const applyBtn = document.getElementById('applyMermaidChanges');
+    const newApplyBtn = applyBtn.cloneNode(true);
+    applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
+
+    newApplyBtn.addEventListener('click', () => {
+        const activeEditor = window.tabManager?.getActiveEditor();
+        if (activeEditor) {
+            activeEditor.applyMermaidChanges();
+        }
+    });
+
+    // Auto-import on paste
+    const mermaidInput = document.getElementById('mermaidInput');
+    const newMermaidInput = mermaidInput.cloneNode(true);
+    mermaidInput.parentNode.replaceChild(newMermaidInput, mermaidInput);
+
+    newMermaidInput.addEventListener('paste', () => {
+        setTimeout(() => {
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                activeEditor.importFromSidebarTextarea();
+            }
+        }, 100);
+    });
+
+    // Debounced auto-import on input
+    let importTimeout;
+    newMermaidInput.addEventListener('input', () => {
+        clearTimeout(importTimeout);
+        importTimeout = setTimeout(() => {
+            const activeEditor = window.tabManager?.getActiveEditor();
+            if (activeEditor) {
+                activeEditor.importFromSidebarTextarea();
+            }
+        }, 500);
+    });
+
+    // Note: Auto-apply is disabled to prevent unwanted imports when updating output programmatically
+    // Users must click "Apply Changes" button manually
+}
+
 // Initialize
 setupSharedUIEvents();
 setupLayerPanel();
 setupComparisonToolbar();
+setupMermaidLayoutListeners();
+setupMermaidButtons();
 window.tabManager = new TabManager();
