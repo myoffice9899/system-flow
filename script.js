@@ -50,6 +50,11 @@ class DiagramEditor {
         this.strokeColor = '#000000';
         this.strokeWidth = 2;
 
+        // Connection/Arrow defaults
+        this.currentLineStyle = 'solid';
+        this.currentStartArrow = 'none';
+        this.currentEndArrow = 'arrow';
+
         // Zoom state
         this.zoom = 1.0;
         this.minZoom = 0.1;
@@ -68,6 +73,15 @@ class DiagramEditor {
         this.editingTarget = null; // Can be shape or connection
         this.cursorVisible = true;
         this.cursorBlinkInterval = null;
+        this.textSelectionStart = -1;
+        this.textSelectionEnd = -1;
+
+        // Create hidden textarea for text editing with proper selection support
+        this.hiddenTextarea = document.createElement('textarea');
+        this.hiddenTextarea.style.position = 'fixed';
+        this.hiddenTextarea.style.left = '-9999px';
+        this.hiddenTextarea.style.top = '-9999px';
+        document.body.appendChild(this.hiddenTextarea);
 
         // Modern mode
         this.modernMode = false;
@@ -253,6 +267,25 @@ class DiagramEditor {
                 this.selectedShape.strokeWidth = parseInt(e.target.value);
                 this.redraw();
             }
+        });
+
+        // Line style buttons
+        document.querySelectorAll('[data-line-style]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const lineStyle = btn.getAttribute('data-line-style');
+                this.currentLineStyle = lineStyle;
+
+                // Update active state
+                document.querySelectorAll('[data-line-style]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Apply to selected connections
+                this.selectedConnections.forEach(conn => {
+                    conn.lineStyle = lineStyle;
+                });
+                this.saveState();
+                this.redraw();
+            });
         });
 
         // Action buttons
@@ -586,13 +619,7 @@ class DiagramEditor {
             }
         }, { passive: false });
 
-        // Keyboard events for text editing on canvas
-        document.addEventListener('keydown', (e) => {
-            if (this.editingTarget) {
-                e.preventDefault();
-                this.handleTextInput(e);
-            }
-        });
+        // Text editing is now handled by hidden textarea
     }
 
     updateActiveButton(activeBtn) {
@@ -813,8 +840,9 @@ class DiagramEditor {
                     type: 'arrow',
                     label: '',
                     note: '',
-                    startArrow: 'none',  // none, arrow, circle, diamond
-                    endArrow: 'arrow'    // none, arrow, circle, diamond
+                    startArrow: this.currentStartArrow,
+                    endArrow: this.currentEndArrow,
+                    lineStyle: this.currentLineStyle
                 });
                 needsSave = true;
             } else if (!targetShape) {
@@ -848,8 +876,9 @@ class DiagramEditor {
                     type: 'arrow',
                     label: '',
                     note: '',
-                    startArrow: 'none',
-                    endArrow: 'arrow'
+                    startArrow: this.currentStartArrow,
+                    endArrow: this.currentEndArrow,
+                    lineStyle: this.currentLineStyle
                 });
                 needsSave = true;
             }
@@ -942,6 +971,60 @@ class DiagramEditor {
     showInlineEditor(target, mouseEvent) {
         this.editingTarget = target;
 
+        // Get current text
+        const isConnection = target.hasOwnProperty('from') && target.hasOwnProperty('to');
+        const currentText = isConnection ? (target.label || '') : (target.text || '');
+
+        // Setup hidden textarea with current text
+        this.hiddenTextarea.value = currentText;
+        this.hiddenTextarea.focus();
+        this.hiddenTextarea.select(); // Select all text by default
+
+        // Track selection changes for highlighting
+        const updateSelection = () => {
+            this.textSelectionStart = this.hiddenTextarea.selectionStart;
+            this.textSelectionEnd = this.hiddenTextarea.selectionEnd;
+            this.redraw();
+        };
+
+        // Listen for input changes
+        const updateText = () => {
+            const newText = this.hiddenTextarea.value;
+            if (isConnection) {
+                this.editingTarget.label = newText;
+            } else {
+                this.editingTarget.text = newText;
+            }
+            updateSelection();
+        };
+
+        this.hiddenTextarea.oninput = updateText;
+        this.hiddenTextarea.onselect = updateSelection;
+        this.hiddenTextarea.onkeyup = updateSelection; // Track selection on key up (arrows, Ctrl+A, etc.)
+        this.hiddenTextarea.onmouseup = updateSelection; // Track mouse selection
+
+        this.hiddenTextarea.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.finishInlineEdit();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.cancelInlineEdit();
+            }
+        };
+
+        this.hiddenTextarea.onblur = () => {
+            // Only finish if we're still editing this target
+            if (this.editingTarget === target) {
+                this.finishInlineEdit();
+            }
+        };
+
+        // Initialize selection state (all selected by default)
+        setTimeout(() => {
+            updateSelection();
+        }, 0);
+
         // Start cursor blinking
         this.cursorVisible = true;
         if (this.cursorBlinkInterval) {
@@ -955,35 +1038,6 @@ class DiagramEditor {
         this.redraw();
     }
 
-    handleTextInput(e) {
-        if (!this.editingTarget) return;
-
-        const isConnection = this.editingTarget.hasOwnProperty('from') && this.editingTarget.hasOwnProperty('to');
-        let currentText = isConnection ? (this.editingTarget.label || '') : (this.editingTarget.text || '');
-
-        if (e.key === 'Enter') {
-            this.finishInlineEdit();
-        } else if (e.key === 'Escape') {
-            this.cancelInlineEdit();
-        } else if (e.key === 'Backspace') {
-            const newText = currentText.slice(0, -1);
-            if (isConnection) {
-                this.editingTarget.label = newText;
-            } else {
-                this.editingTarget.text = newText;
-            }
-            this.redraw();
-        } else if (e.key.length === 1) {
-            // Single character key
-            const newText = currentText + e.key;
-            if (isConnection) {
-                this.editingTarget.label = newText;
-            } else {
-                this.editingTarget.text = newText;
-            }
-            this.redraw();
-        }
-    }
 
     finishInlineEdit() {
         if (!this.editingTarget) return;
@@ -994,8 +1048,19 @@ class DiagramEditor {
             this.cursorBlinkInterval = null;
         }
 
-        // Clear editing state
+        // Clear textarea event handlers
+        this.hiddenTextarea.oninput = null;
+        this.hiddenTextarea.onkeydown = null;
+        this.hiddenTextarea.onblur = null;
+        this.hiddenTextarea.onselect = null;
+        this.hiddenTextarea.onkeyup = null;
+        this.hiddenTextarea.onmouseup = null;
+        this.hiddenTextarea.value = '';
+
+        // Clear editing and selection state
         this.editingTarget = null;
+        this.textSelectionStart = -1;
+        this.textSelectionEnd = -1;
 
         this.saveState();
         this.redraw();
@@ -1008,7 +1073,20 @@ class DiagramEditor {
             this.cursorBlinkInterval = null;
         }
 
+        // Clear textarea event handlers
+        this.hiddenTextarea.oninput = null;
+        this.hiddenTextarea.onkeydown = null;
+        this.hiddenTextarea.onblur = null;
+        this.hiddenTextarea.onselect = null;
+        this.hiddenTextarea.onkeyup = null;
+        this.hiddenTextarea.onmouseup = null;
+        this.hiddenTextarea.value = '';
+
+        // Clear editing and selection state
         this.editingTarget = null;
+        this.textSelectionStart = -1;
+        this.textSelectionEnd = -1;
+
         this.redraw();
     }
 
@@ -2166,24 +2244,45 @@ class DiagramEditor {
             this.ctx.fillText(shape.text, centerX, centerY);
         }
 
-        // Draw cursor if editing this shape (not in Impact Analysis mode)
-        if (this.editingTarget === shape && this.cursorVisible && !this.impactAnalysisMode) {
+        // Draw text selection highlight and cursor if editing this shape
+        if (this.editingTarget === shape && !this.impactAnalysisMode) {
             const text = shape.text || '';
             this.ctx.font = '14px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
 
-            // Measure text width to position cursor at the end
-            const textMetrics = this.ctx.measureText(text);
-            const cursorX = centerX + textMetrics.width / 2;
+            // Draw selection highlight if text is selected
+            if (this.textSelectionStart !== this.textSelectionEnd && this.textSelectionStart !== -1) {
+                const beforeSelection = text.substring(0, this.textSelectionStart);
+                const selectedText = text.substring(this.textSelectionStart, this.textSelectionEnd);
 
-            // Draw cursor line
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.moveTo(cursorX, centerY - 10);
-            this.ctx.lineTo(cursorX, centerY + 10);
-            this.ctx.stroke();
+                const beforeWidth = this.ctx.measureText(beforeSelection).width;
+                const selectedWidth = this.ctx.measureText(selectedText).width;
+                const totalWidth = this.ctx.measureText(text).width;
+
+                // Calculate selection rectangle position
+                const textStartX = centerX - totalWidth / 2;
+                const highlightX = textStartX + beforeWidth;
+                const highlightY = centerY - 10;
+                const highlightHeight = 20;
+
+                // Draw blue highlight background
+                this.ctx.fillStyle = 'rgba(0, 120, 215, 0.3)'; // Windows-style blue selection
+                this.ctx.fillRect(highlightX, highlightY, selectedWidth, highlightHeight);
+            }
+
+            // Draw cursor line if visible and no selection (or cursor position)
+            if (this.cursorVisible && this.textSelectionStart === this.textSelectionEnd) {
+                const textMetrics = this.ctx.measureText(text);
+                const cursorX = centerX + textMetrics.width / 2;
+
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(cursorX, centerY - 10);
+                this.ctx.lineTo(cursorX, centerY + 10);
+                this.ctx.stroke();
+            }
         }
 
         // Reset shadow for modern mode
@@ -2781,20 +2880,43 @@ class DiagramEditor {
         this.ctx.textBaseline = 'middle';
         this.ctx.fillText(label, x, y);
 
-        // Draw cursor if editing this connection
-        if (connection && this.editingTarget === connection && this.cursorVisible) {
+        // Draw text selection highlight and cursor if editing this connection
+        if (connection && this.editingTarget === connection) {
             const text = connection.label || '';
             this.ctx.font = 'bold 14px Arial';
-            const textMetrics = this.ctx.measureText(text);
-            const cursorX = x + textMetrics.width / 2;
+            const totalWidth = this.ctx.measureText(text).width;
+            const textStartX = x - totalWidth / 2;
 
-            // Draw cursor line
-            this.ctx.strokeStyle = '#667eea';
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.moveTo(cursorX, y - 10);
-            this.ctx.lineTo(cursorX, y + 10);
-            this.ctx.stroke();
+            // Draw selection highlight if text is selected
+            if (this.textSelectionStart !== this.textSelectionEnd && this.textSelectionStart !== -1) {
+                const beforeSelection = text.substring(0, this.textSelectionStart);
+                const selectedText = text.substring(this.textSelectionStart, this.textSelectionEnd);
+
+                const beforeWidth = this.ctx.measureText(beforeSelection).width;
+                const selectedWidth = this.ctx.measureText(selectedText).width;
+
+                // Calculate selection rectangle position
+                const highlightX = textStartX + beforeWidth;
+                const highlightY = y - 10;
+                const highlightHeight = 20;
+
+                // Draw blue highlight background
+                this.ctx.fillStyle = 'rgba(0, 120, 215, 0.3)'; // Windows-style blue selection
+                this.ctx.fillRect(highlightX, highlightY, selectedWidth, highlightHeight);
+            }
+
+            // Draw cursor line if visible and no selection
+            if (this.cursorVisible && this.textSelectionStart === this.textSelectionEnd) {
+                const textMetrics = this.ctx.measureText(text);
+                const cursorX = x + textMetrics.width / 2;
+
+                this.ctx.strokeStyle = '#667eea';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(cursorX, y - 10);
+                this.ctx.lineTo(cursorX, y + 10);
+                this.ctx.stroke();
+            }
         }
     }
 

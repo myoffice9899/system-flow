@@ -58,8 +58,6 @@
                     </svg>
                 </button>
 
-                <div class="tool-separator"></div>
-
                 <button class="tool-btn" data-shape="rectangle" title="Rectangle (R)">
                     <svg width="20" height="20" viewBox="0 0 20 20">
                         <rect x="2" y="5" width="16" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -81,8 +79,6 @@
                     </svg>
                 </button>
 
-                <div class="tool-separator"></div>
-
                 <button class="tool-btn" data-shape="database" title="Database">
                     <svg width="20" height="20" viewBox="0 0 20 20">
                         <ellipse cx="10" cy="6" rx="6" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -99,6 +95,28 @@
                     <svg width="20" height="20" viewBox="0 0 20 20">
                         <circle cx="10" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
                         <path d="M 5 16 Q 5 11 10 11 Q 15 11 15 16" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                </button>
+
+                <!-- Connection/Line Styles -->
+                <button class="tool-btn active" id="solidLineBtn" title="Solid Line" data-line-style="solid">
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                        <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
+                <button class="tool-btn" id="dashedLineBtn" title="Dashed Line" data-line-style="dashed">
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                        <line x1="3" y1="10" x2="7" y2="10" stroke="currentColor" stroke-width="2"/>
+                        <line x1="9" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2"/>
+                        <line x1="15" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
+                <button class="tool-btn" id="dottedLineBtn" title="Dotted Line" data-line-style="dotted">
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                        <circle cx="4" cy="10" r="1.5" fill="currentColor"/>
+                        <circle cx="8" cy="10" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="10" r="1.5" fill="currentColor"/>
+                        <circle cx="16" cy="10" r="1.5" fill="currentColor"/>
                     </svg>
                 </button>
             </div>
