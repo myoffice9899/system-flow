@@ -592,18 +592,7 @@ class DiagramEditor {
             e.target.value = ''; // Reset input
         });
 
-        // Hamburger menu is now handled globally in setupSharedUIEvents()
-
-        // Layer dropdown toggle (only toggle with button, stays open otherwise)
-        const layerToggleBtn = document.getElementById('layerToggleBtn');
-        const layerPanel = document.getElementById('layerPanel');
-
-        layerToggleBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isVisible = layerPanel.style.display === 'flex';
-            layerPanel.style.display = isVisible ? 'none' : 'flex';
-            layerToggleBtn.classList.toggle('active', !isVisible);
-        });
+        // Hamburger menu and Layer panel are now handled globally in setupSharedUIEvents()
 
         // Zoom controls
         document.getElementById('zoomIn').addEventListener('click', () => this.zoomIn());
@@ -5874,6 +5863,29 @@ function setupSharedUIEvents() {
         if (!newHamburgerBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
             dropdownMenu.style.display = 'none';
             newHamburgerBtn.classList.remove('active');
+        }
+    });
+
+    // Layer panel toggle (shared across all tabs)
+    const layerToggleBtn = document.getElementById('layerToggleBtn');
+    const layerPanel = document.getElementById('layerPanel');
+
+    // Remove existing listeners by cloning
+    const newLayerToggleBtn = layerToggleBtn.cloneNode(true);
+    layerToggleBtn.parentNode.replaceChild(newLayerToggleBtn, layerToggleBtn);
+
+    newLayerToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = layerPanel.style.display === 'flex';
+        layerPanel.style.display = isVisible ? 'none' : 'flex';
+        newLayerToggleBtn.classList.toggle('active', !isVisible);
+    });
+
+    // Close layer panel when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!newLayerToggleBtn.contains(e.target) && !layerPanel.contains(e.target)) {
+            layerPanel.style.display = 'none';
+            newLayerToggleBtn.classList.remove('active');
         }
     });
 }
