@@ -3592,6 +3592,27 @@ class DiagramEditor {
     }
 
     async saveToFile(fileHandle) {
+        // Check if we have multiple tabs
+        if (window.tabManager && window.tabManager.tabs.size > 1) {
+            // Save all tabs
+            const data = window.tabManager.exportAllTabs();
+            const json = JSON.stringify(data, null, 2);
+
+            try {
+                const writable = await fileHandle.createWritable();
+                await writable.write(json);
+                await writable.close();
+                this.currentFileHandle = fileHandle;
+                this.currentFileName = fileHandle.name;
+                alert('All tabs saved successfully!');
+            } catch (err) {
+                console.error('Error saving file:', err);
+                alert('Error saving file: ' + err.message);
+            }
+            return;
+        }
+
+        // Single tab mode - save current editor only
         // Save current state if inside a group
         if (this.currentGroup) {
             this.currentGroup.children = [...this.shapes];
@@ -3781,6 +3802,13 @@ class DiagramEditor {
                 } else {
                     const data = JSON.parse(fileContent);
 
+                    // Check if this is a multi-tab file (version 2.0)
+                    if (data.version === '2.0' && data.tabs && window.tabManager) {
+                        window.tabManager.importAllTabs(data);
+                        return;
+                    }
+
+                    // Single tab mode - load into current editor
                     // Helper function to deserialize shapes with children
                     const deserializeShape = (shapeData) => {
                         const shape = { ...shapeData };
@@ -6030,6 +6058,154 @@ class TabManager {
                 comparisonWarning.style.display = 'none';
             }
         }
+    }
+
+    importAllTabs(data) {
+        // Close all existing tabs except the first one
+        const tabIds = Array.from(this.tabs.keys());
+        for (let i = tabIds.length - 1; i > 0; i--) {
+            const tabId = tabIds[i];
+            const tabElement = document.querySelector(`.bottom-tab[data-tab-id="${tabId}"]`);
+            if (tabElement) {
+                tabElement.remove();
+            }
+            this.tabs.delete(tabId);
+        }
+
+        // Helper function to deserialize shapes with children
+        const deserializeShape = (shapeData) => {
+            const shape = { ...shapeData };
+            if (shapeData.children && shapeData.children.length > 0) {
+                shape.children = shapeData.children.map(child => deserializeShape(child));
+
+                // Restore child connections
+                if (shapeData.childConnections) {
+                    shape.childConnections = shapeData.childConnections.map(conn => ({
+                        from: shape.children[conn.from],
+                        to: shape.children[conn.to],
+                        type: conn.type,
+                        label: conn.label || ''
+                    }));
+                } else {
+                    shape.childConnections = [];
+                }
+            }
+            return shape;
+        };
+
+        // Load all tabs
+        data.tabs.forEach((tabData, index) => {
+            let tabId, editor;
+
+            if (index === 0) {
+                // Use the existing first tab
+                tabId = tabIds[0];
+                const tab = this.tabs.get(tabId);
+                editor = tab.editor;
+                tab.name = tabData.name;
+
+                // Update tab name in UI
+                const tabElement = document.querySelector(`.bottom-tab[data-tab-id="${tabId}"] .bottom-tab-name`);
+                if (tabElement) {
+                    tabElement.textContent = tabData.name;
+                }
+            } else {
+                // Create new tab
+                tabId = this.createNewTab();
+                const tab = this.tabs.get(tabId);
+                editor = tab.editor;
+                tab.name = tabData.name;
+
+                // Update tab name in UI
+                const tabElement = document.querySelector(`.bottom-tab[data-tab-id="${tabId}"] .bottom-tab-name`);
+                if (tabElement) {
+                    tabElement.textContent = tabData.name;
+                }
+            }
+
+            // Load shapes and connections into this editor
+            editor.shapes = (tabData.shapes || []).map(shape => deserializeShape(shape));
+            editor.connections = tabData.connections.map(conn => ({
+                from: editor.shapes[conn.from],
+                to: editor.shapes[conn.to],
+                type: conn.type,
+                label: conn.label || ''
+            }));
+
+            // Reset hierarchy state
+            editor.rootShapes = [...editor.shapes];
+            editor.rootConnections = [...editor.connections];
+            editor.currentGroup = null;
+            editor.groupPath = [];
+            editor.selectedShape = null;
+            editor.selectedShapes = [];
+
+            // Update UI for this editor
+            editor.updateBreadcrumb();
+        });
+
+        // Switch to the active tab from the saved file
+        if (data.activeTabId && this.tabs.has(data.activeTabId)) {
+            this.switchTab(data.activeTabId);
+        } else {
+            // Fallback to first tab
+            this.switchTab(tabIds[0]);
+        }
+
+        alert('All tabs loaded successfully!');
+    }
+
+    exportAllTabs() {
+        const tabsData = [];
+
+        this.tabs.forEach((tab, tabId) => {
+            const editor = tab.editor;
+
+            // Save current state if inside a group
+            if (editor.currentGroup) {
+                editor.currentGroup.children = [...editor.shapes];
+                editor.currentGroup.childConnections = [...editor.connections];
+            }
+
+            // Use root shapes for export
+            const shapesToExport = editor.currentGroup === null ? editor.shapes : editor.rootShapes;
+            const connectionsToExport = editor.currentGroup === null ? editor.connections : editor.rootConnections;
+
+            // Helper function to serialize shapes with their children
+            const serializeShape = (shape) => {
+                const serialized = { ...shape };
+                if (shape.children) {
+                    serialized.children = shape.children.map(child => serializeShape(child));
+                }
+                if (shape.childConnections) {
+                    serialized.childConnections = shape.childConnections.map(conn => ({
+                        from: shape.children.indexOf(conn.from),
+                        to: shape.children.indexOf(conn.to),
+                        type: conn.type,
+                        label: conn.label
+                    }));
+                }
+                return serialized;
+            };
+
+            tabsData.push({
+                tabId: tabId,
+                name: tab.name,
+                shapes: shapesToExport.map(shape => serializeShape(shape)),
+                connections: connectionsToExport.map(conn => ({
+                    from: shapesToExport.indexOf(conn.from),
+                    to: shapesToExport.indexOf(conn.to),
+                    type: conn.type,
+                    label: conn.label
+                }))
+            });
+        });
+
+        return {
+            version: '2.0', // New version to support multiple tabs
+            activeTabId: this.activeTabId,
+            tabs: tabsData
+        };
     }
 
     closeTab(tabId) {
