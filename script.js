@@ -346,21 +346,8 @@ class DiagramEditor {
             }
         });
 
-        // File operations
-        document.getElementById('saveFile').addEventListener('click', () => {
-            this.save();
-            document.getElementById('dropdownMenu').style.display = 'none';
-            document.getElementById('hamburgerBtn').classList.remove('active');
-            document.getElementById('recentFilesMenu').style.display = 'none';
-            document.getElementById('folderFilesMenu').style.display = 'none';
-        });
-        document.getElementById('saveAsFile').addEventListener('click', () => {
-            this.saveAs();
-            document.getElementById('dropdownMenu').style.display = 'none';
-            document.getElementById('hamburgerBtn').classList.remove('active');
-            document.getElementById('recentFilesMenu').style.display = 'none';
-            document.getElementById('folderFilesMenu').style.display = 'none';
-        });
+        // File operations - Save and Save As are now handled globally in setupFileOperations()
+
         document.getElementById('openFile').addEventListener('click', async () => {
             document.getElementById('dropdownMenu').style.display = 'none';
             document.getElementById('hamburgerBtn').classList.remove('active');
@@ -3546,6 +3533,12 @@ class DiagramEditor {
     }
 
     async save() {
+        // Check if we have multiple tabs - always use Save As (download method)
+        if (window.tabManager && window.tabManager.tabs.size > 1) {
+            await this.saveAs();
+            return;
+        }
+
         if (this.currentFileHandle) {
             // Save to existing file
             await this.saveToFile(this.currentFileHandle);
@@ -3556,7 +3549,30 @@ class DiagramEditor {
     }
 
     async saveAs() {
+        console.log('[saveAs] Called, tabs count:', window.tabManager?.tabs.size);
         try {
+            // Check if we have multiple tabs - use fallback method
+            if (window.tabManager && window.tabManager.tabs.size > 1) {
+                console.log('[saveAs] Multi-tab save');
+                const filename = prompt('Enter filename:', this.currentFileName || 'diagram.json');
+                console.log('[saveAs] Filename:', filename);
+                if (filename) {
+                    this.currentFileName = filename.endsWith('.json') ? filename : filename + '.json';
+                    const data = window.tabManager.exportAllTabs();
+                    const json = JSON.stringify(data, null, 2);
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = this.currentFileName;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    console.log('[saveAs] Download completed');
+                    alert('All tabs saved successfully!');
+                }
+                return;
+            }
+
             // Check if File System Access API is supported
             if (!window.showSaveFilePicker) {
                 // Fallback to old download method
@@ -3604,7 +3620,7 @@ class DiagramEditor {
                 await writable.close();
                 this.currentFileHandle = fileHandle;
                 this.currentFileName = fileHandle.name;
-                alert('All tabs saved successfully!');
+                // Don't show alert here - it's shown in saveAs()
             } catch (err) {
                 console.error('Error saving file:', err);
                 alert('Error saving file: ' + err.message);
@@ -3734,6 +3750,14 @@ class DiagramEditor {
             try {
                 const data = JSON.parse(text);
 
+                // Check if this is a multi-tab file (version 2.0)
+                if (data.version === '2.0' && data.tabs && window.tabManager) {
+                    console.log('[openFileWithPicker] Multi-tab file detected');
+                    window.tabManager.importAllTabs(data);
+                    return;
+                }
+
+                // Single tab mode - load into current editor
                 // Clear current state
                 this.shapes = [];
                 this.connections = [];
@@ -3762,12 +3786,12 @@ class DiagramEditor {
                 };
 
                 // Load shapes
-                const loadedShapes = data.shapes.map(shape => deserializeShape(shape));
+                const loadedShapes = (data.shapes || []).map(shape => deserializeShape(shape));
                 this.shapes = loadedShapes;
                 this.rootShapes = [...loadedShapes];
 
                 // Load connections
-                this.connections = data.connections.map(conn => ({
+                this.connections = (data.connections || []).map(conn => ({
                     from: loadedShapes[conn.from],
                     to: loadedShapes[conn.to],
                     type: conn.type || 'line',
@@ -3777,7 +3801,8 @@ class DiagramEditor {
 
                 this.redraw();
             } catch (error) {
-                alert('Error loading file: ' + error.message);
+                console.error('[openFileWithPicker] Error:', error);
+                console.error('[openFileWithPicker] Stack:', error.stack);
             }
         } catch (err) {
             if (err.name !== 'AbortError') {
@@ -3801,10 +3826,18 @@ class DiagramEditor {
                     this.importFromMermaid(fileContent);
                 } else {
                     const data = JSON.parse(fileContent);
+                    console.log('[openFile] Parsed data:', data);
 
                     // Check if this is a multi-tab file (version 2.0)
                     if (data.version === '2.0' && data.tabs && window.tabManager) {
-                        window.tabManager.importAllTabs(data);
+                        console.log('[openFile] Multi-tab file detected');
+                        try {
+                            window.tabManager.importAllTabs(data);
+                        } catch (err) {
+                            console.error('[openFile] Error in importAllTabs:', err);
+                            console.error('Stack trace:', err.stack);
+                            throw err;
+                        }
                         return;
                     }
 
@@ -3852,7 +3885,11 @@ class DiagramEditor {
                     this.redraw();
                 }
             } catch (error) {
-                alert('Error loading file: ' + error.message);
+                console.error('[openFile] Error loading file:', error);
+                console.error('[openFile] Error stack:', error.stack);
+                console.error('[openFile] File content:', fileContent);
+                // Don't show alert, just log to console
+                console.error('❌ ERROR: ' + error.message);
             }
         };
         reader.readAsText(file);
@@ -5382,7 +5419,8 @@ class DiagramEditor {
                 document.getElementById('backButton').style.display = 'none';
                 this.redraw();
             } catch (error) {
-                alert('Error loading file: ' + error.message);
+                console.error('[openFileFromFolder] Error:', error);
+                console.error('[openFileFromFolder] Stack:', error.stack);
             }
         };
         reader.readAsText(file);
@@ -5962,19 +6000,16 @@ class TabManager {
             // This ensures we get fresh data from the current tab's shapes
             console.log('[switchTab] Re-generating mermaid for tab', tabId);
 
-            // Important: Use a small delay to ensure canvas has been switched
-            setTimeout(() => {
-                if (newTab.editor.shapes.length > 0) {
-                    const mermaidCode = newTab.editor.generateMermaidFromDiagram();
-                    console.log('[switchTab] Generated code:', mermaidCode);
-                    document.getElementById('mermaidOutput').value = mermaidCode;
-                    newTab.editor.mermaidOutputCode = mermaidCode;
-                } else {
-                    console.log('[switchTab] No shapes in tab', tabId);
-                    document.getElementById('mermaidOutput').value = 'flowchart LR\n';
-                    newTab.editor.mermaidOutputCode = 'flowchart LR\n';
-                }
-            }, 0);
+            if (newTab.editor.shapes.length > 0) {
+                const mermaidCode = newTab.editor.generateMermaidFromDiagram();
+                console.log('[switchTab] Generated code:', mermaidCode);
+                document.getElementById('mermaidOutput').value = mermaidCode;
+                newTab.editor.mermaidOutputCode = mermaidCode;
+            } else {
+                console.log('[switchTab] No shapes in tab', tabId);
+                document.getElementById('mermaidOutput').value = 'flowchart LR\n';
+                newTab.editor.mermaidOutputCode = 'flowchart LR\n';
+            }
         } else {
             // Just restore saved content if not in view mode
             console.log('[switchTab] Not in view mode, restoring saved content');
@@ -6061,6 +6096,8 @@ class TabManager {
     }
 
     importAllTabs(data) {
+        console.log('[importAllTabs] Data:', data);
+
         // Close all existing tabs except the first one
         const tabIds = Array.from(this.tabs.keys());
         for (let i = tabIds.length - 1; i > 0; i--) {
@@ -6094,7 +6131,9 @@ class TabManager {
         };
 
         // Load all tabs
+        console.log('[importAllTabs] Tabs:', data.tabs);
         data.tabs.forEach((tabData, index) => {
+            console.log('[importAllTabs] Processing tab', index, tabData);
             let tabId, editor;
 
             if (index === 0) {
@@ -6125,7 +6164,7 @@ class TabManager {
 
             // Load shapes and connections into this editor
             editor.shapes = (tabData.shapes || []).map(shape => deserializeShape(shape));
-            editor.connections = tabData.connections.map(conn => ({
+            editor.connections = (tabData.connections || []).map(conn => ({
                 from: editor.shapes[conn.from],
                 to: editor.shapes[conn.to],
                 type: conn.type,
@@ -6150,6 +6189,12 @@ class TabManager {
         } else {
             // Fallback to first tab
             this.switchTab(tabIds[0]);
+        }
+
+        // Force redraw the active tab
+        const activeEditor = this.getActiveEditor();
+        if (activeEditor) {
+            activeEditor.redraw();
         }
 
         alert('All tabs loaded successfully!');
@@ -6465,6 +6510,41 @@ function setupComparisonToolbar() {
     }
 }
 
+// Global file operations (Save, Save As)
+function setupFileOperations() {
+    // Save File
+    const saveFileBtn = document.getElementById('saveFile');
+    const newSaveFileBtn = saveFileBtn.cloneNode(true);
+    saveFileBtn.parentNode.replaceChild(newSaveFileBtn, saveFileBtn);
+
+    newSaveFileBtn.addEventListener('click', async () => {
+        const activeEditor = window.tabManager?.getActiveEditor();
+        if (activeEditor) {
+            await activeEditor.save();
+        }
+        document.getElementById('dropdownMenu').style.display = 'none';
+        document.getElementById('hamburgerBtn').classList.remove('active');
+        document.getElementById('recentFilesMenu').style.display = 'none';
+        document.getElementById('folderFilesMenu').style.display = 'none';
+    });
+
+    // Save As File
+    const saveAsFileBtn = document.getElementById('saveAsFile');
+    const newSaveAsFileBtn = saveAsFileBtn.cloneNode(true);
+    saveAsFileBtn.parentNode.replaceChild(newSaveAsFileBtn, saveAsFileBtn);
+
+    newSaveAsFileBtn.addEventListener('click', async () => {
+        const activeEditor = window.tabManager?.getActiveEditor();
+        if (activeEditor) {
+            await activeEditor.saveAs();
+        }
+        document.getElementById('dropdownMenu').style.display = 'none';
+        document.getElementById('hamburgerBtn').classList.remove('active');
+        document.getElementById('recentFilesMenu').style.display = 'none';
+        document.getElementById('folderFilesMenu').style.display = 'none';
+    });
+}
+
 // Global Mermaid layout direction listeners (work with active editor only)
 function setupMermaidLayoutListeners() {
     // Import mode (layoutDirection)
@@ -6565,6 +6645,7 @@ function setupMermaidButtons() {
 setupSharedUIEvents();
 setupLayerPanel();
 setupComparisonToolbar();
+setupFileOperations();
 setupMermaidLayoutListeners();
 setupMermaidButtons();
 window.tabManager = new TabManager();
